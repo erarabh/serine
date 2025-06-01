@@ -68,24 +68,6 @@ export default function Dashboard() {
   setStatus(`✅ Finished! Added ${result.count} Q&A.`)
 }
 
-
-  const extractQAPairs = (text: string) => {
-    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
-    const qaPairs: { question: string; answer: string }[] = []
-
-    for (let i = 0; i < lines.length - 1; i++) {
-      const line = lines[i]
-      if (line.endsWith('?') || /^[A-Z]/.test(line)) {
-        const next = lines[i + 1]
-        if (next && next.length > 30) {
-          qaPairs.push({ question: line, answer: next })
-        }
-      }
-    }
-
-    return qaPairs
-  }
-
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.reload()
