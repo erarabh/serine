@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable @typescript-eslint/no-explicit-any */ // ✅ temporary bypass for browser speech types
+
 import { useEffect, useRef, useState } from 'react'
 import { ui, defaultLang, Language } from '@/lib/i18n'
 import ToggleVoice from '@/components/ToggleVoice'
@@ -12,13 +14,13 @@ interface Props {
 
 type ChatMessage = { sender: 'user' | 'bot'; text: string }
 
-// This declaration avoids ESLint errors with explicit 'any'
 declare global {
   interface Window {
     webkitSpeechRecognition: any
     SpeechRecognition: any
   }
 }
+
 
 const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
