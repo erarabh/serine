@@ -12,7 +12,7 @@ export default function Home() {
 
       <div className="bg-white p-6 rounded shadow-lg">
         <h2 className="text-xl font-semibold text-purple-600 mb-2">Live Demo</h2>
-        <ChatWidget voiceEnabled={isVoiceAllowed} />
+        <ChatWidget />
       </div>
     </main>
   )
