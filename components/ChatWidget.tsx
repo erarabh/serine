@@ -68,7 +68,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
       recognition.interimResults = false
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const spoken = event.results[0][0].transcript
+  const spoken = event.results[0][0].transcript
         setInput(spoken)
 
         setTimeout(() => {
