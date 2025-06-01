@@ -5,40 +5,35 @@ import { ui, defaultLang, Language } from '@/lib/i18n'
 import ToggleVoice from '@/components/ToggleVoice'
 import { isVoiceAllowed } from '@/utils/planCheck'
 
-// Fix for missing type during SSR build
-declare global {
-  interface Window {
-    webkitSpeechRecognition: any
-    SpeechRecognition: any
-  }
-}
-
-type SpeechRecognition = any
-
 interface Props {
   lang?: Language
   userPlan?: string
 }
 
+type ChatMessage = { sender: 'user' | 'bot'; text: string }
+
+// Declare compatible type for recognition constructor
+type RecognitionConstructor = new () => SpeechRecognition
+
 const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
-  const [messages, setMessages] = useState<{ sender: 'user' | 'bot'; text: string }[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [voiceEnabled, setVoiceEnabled] = useState(true)
 
   const recognitionRef = useRef<SpeechRecognition & { started?: boolean } | null>(null)
-
   const t = ui[lang]
 
   useEffect(() => {
     const SpeechRecognitionConstructor =
-      window.webkitSpeechRecognition || window.SpeechRecognition
+      (window as unknown as { webkitSpeechRecognition?: RecognitionConstructor }).webkitSpeechRecognition ||
+      (window as unknown as { SpeechRecognition?: RecognitionConstructor }).SpeechRecognition
 
     if (SpeechRecognitionConstructor) {
       const recognition = new SpeechRecognitionConstructor()
       recognition.lang = lang
       recognition.interimResults = false
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         const spoken = event.results[0][0].transcript
         setInput(spoken)
 
@@ -51,7 +46,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
             body: JSON.stringify({ message: spoken }),
           })
             .then((res) => res.json())
-            .then(({ reply }) => {
+            .then(({ reply }: { reply: string }) => {
               setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
               if (voiceEnabled) {
                 const utterance = new SpeechSynthesisUtterance(reply)
@@ -87,7 +82,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
         }),
       })
 
-      const { reply } = await res.json()
+      const { reply }: { reply: string } = await res.json()
       setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
 
       if (voiceEnabled) {
@@ -116,13 +111,8 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
     <div className="bg-white shadow-md rounded-lg p-4 space-y-4 border border-gray-300">
       <div className="h-64 overflow-y-auto space-y-2 text-black border p-2 rounded bg-gray-50">
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`text-sm whitespace-pre-wrap ${
-              msg.sender === 'user' ? 'text-right text-purple-700' : 'text-left text-gray-800'
-            }`}
-          >
-            {msg.text}
+          <div key={idx} className="text-sm whitespace-pre-wrap">
+            {msg.sender === 'user' ? `🧑‍💼: ${msg.text}` : `🤖: ${msg.text}`}
           </div>
         ))}
       </div>
