@@ -4,19 +4,21 @@
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
+type Sender = 'user' | 'bot'
+
 export default function EmbedChatbot() {
   const searchParams = useSearchParams()
   const userId = searchParams.get('uid')
 
   const [message, setMessage] = useState('')
-  const [chat, setChat] = useState<{ sender: 'user' | 'bot'; text: string }[]>([])
+  const [chat, setChat] = useState<{ sender: Sender; text: string }[]>([])
   const [loading, setLoading] = useState(false)
 
   const sendMessage = async () => {
     if (!message.trim()) return
     if (!userId) return alert('Missing user ID')
 
-    const newChat = [...chat, { sender: 'user' as const, text: message }]
+    const newChat = [...chat, { sender: 'user', text: message }]
     setChat(newChat)
     setMessage('')
     setLoading(true)
@@ -30,10 +32,10 @@ export default function EmbedChatbot() {
 
       const data = await res.json()
       const reply = data?.reply || 'Sorry, I could not understand.'
-      setChat([...newChat, { sender: 'bot' as const, text: reply }])
+      setChat([...newChat, { sender: 'bot', text: reply }])
     } catch (err) {
       console.error('❌ Chat error:', err)
-      setChat([...newChat, { sender: 'bot' as const, text: '❌ Failed to get a response.' }])
+      setChat([...newChat, { sender: 'bot', text: '❌ Failed to get a response.' }])
     }
 
     setLoading(false)
