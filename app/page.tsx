@@ -1,8 +1,7 @@
+// ✅ File: /app/page.tsx
 import ChatWidget from '@/components/ChatWidget'
 
 export default function Home() {
-  const isVoiceAllowed = true // later: check Supabase user plan
-
   return (
     <main className="min-h-screen bg-gradient-to-r from-indigo-400 to-purple-500 p-10 text-white">
       <div className="max-w-3xl mx-auto text-center mb-10">
@@ -17,6 +16,7 @@ export default function Home() {
     </main>
   )
 }
+
 
 /*
 import Image from "next/image";
