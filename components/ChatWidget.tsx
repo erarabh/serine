@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useRef, useState } from 'react'
 import { ui, defaultLang, Language } from '@/lib/i18n'
 import ToggleVoice from '@/components/ToggleVoice'
@@ -6,54 +7,58 @@ import { isVoiceAllowed } from '@/utils/planCheck'
 
 const ChatWidget = ({
   lang = defaultLang,
-  userPlan = 'pro', // Force pro to show mic during dev
+  userPlan = 'pro',
 }: {
   lang?: Language
   userPlan?: string
 }) => {
   const [messages, setMessages] = useState<string[]>([])
   const [input, setInput] = useState('')
-  const [voiceEnabled, setVoiceEnabled] = useState(true) // Enable voice by default
+  const [voiceEnabled, setVoiceEnabled] = useState(true)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   const t = ui[lang]
 
   useEffect(() => {
-    // Setup voice recognition (only on supported browsers)
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition =
-        (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
-      recognitionRef.current = new SpeechRecognition()
-      recognitionRef.current.lang = lang
-      recognitionRef.current.interimResults = false
-      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
-        const spoken = event.results[0][0].transcript
-  setInput(spoken)
+      const SpeechRecognitionClass =
+        (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition ||
+        window.SpeechRecognition
 
-  // Auto-send after short delay
-  setTimeout(() => {
-    setMessages((prev) => [...prev, `🧑‍💼: ${spoken}`])
-    fetch('https://serine-backend-production.up.railway.app/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: spoken }),
-    })
-      .then(res => res.json())
-      .then(({ reply }) => {
-        setMessages((prev) => [...prev, `🤖: ${reply}`])
-        if (voiceEnabled) {
-          const utterance = new SpeechSynthesisUtterance(reply)
-          utterance.lang = lang
-          speechSynthesis.speak(utterance)
-        }
-      })
-  }, 1000)
+      const recognition = new SpeechRecognitionClass()
+      recognition.lang = lang
+      recognition.interimResults = false
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const spoken = event.results[0][0].transcript
+        setInput(spoken)
+
+        setTimeout(() => {
+          setMessages((prev) => [...prev, `🧑‍💼: ${spoken}`])
+          fetch('https://serine-backend-production.up.railway.app/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: spoken }),
+          })
+            .then((res) => res.json())
+            .then(({ reply }: { reply: string }) => {
+              setMessages((prev) => [...prev, `🤖: ${reply}`])
+              if (voiceEnabled) {
+                const utterance = new SpeechSynthesisUtterance(reply)
+                utterance.lang = lang
+                speechSynthesis.speak(utterance)
+              }
+            })
+        }, 1000)
       }
-	  recognitionRef.current.onend = () => {
-  (recognitionRef.current as any).started = false
-}
+
+      recognition.onend = () => {
+        (recognition as any).started = false
+      }
+
+      recognitionRef.current = recognition
     }
-  }, [lang])
+  }, [lang, voiceEnabled])
 
   const handleSend = async () => {
     if (!input.trim()) return
@@ -63,17 +68,15 @@ const ChatWidget = ({
 
     try {
       const res = await fetch('https://serine-backend-production.up.railway.app/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    message: userMessage,
-    userId: '6f3b81a4-57f2-4f20-b356-f473bb36de91' // <-- Use your real UUID
-  })
-})
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          userId: '6f3b81a4-57f2-4f20-b356-f473bb36de91',
+        }),
+      })
 
-
-
-      const { reply } = await res.json()
+      const { reply }: { reply: string } = await res.json()
       setMessages((prev) => [...prev, `🤖: ${reply}`])
 
       if (voiceEnabled) {
@@ -81,23 +84,20 @@ const ChatWidget = ({
         utterance.lang = lang
         speechSynthesis.speak(utterance)
       }
-    } catch (err) {
+    } catch {
       setMessages((prev) => [...prev, `⚠️: Server error or not connected.`])
     }
   }
 
   const startVoice = () => {
-  if (recognitionRef.current && (recognitionRef.current as any).started) {
-    return // Already recording
+    if (recognitionRef.current && (recognitionRef.current as any).started) return
+    try {
+      recognitionRef.current?.start()
+      ;(recognitionRef.current as any).started = true
+    } catch {
+      console.warn('Speech already started or not supported.')
+    }
   }
-  try {
-    recognitionRef.current?.start()
-    ;(recognitionRef.current as any).started = true
-  } catch (err) {
-    console.warn('Speech already started or not supported.')
-  }
-}
-
 
   return (
     <div className="bg-white shadow-md rounded-lg p-4 space-y-4 border border-gray-300">
