@@ -15,17 +15,16 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
   const [input, setInput] = useState('')
   const [voiceEnabled, setVoiceEnabled] = useState(true)
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const recognitionRef = useRef<SpeechRecognition & { started?: boolean } | null>(null)
 
   const t = ui[lang]
 
   useEffect(() => {
-    // Setup voice recognition
     const SpeechRecognitionConstructor =
-      (window as typeof window & {
+      (window as unknown as {
         webkitSpeechRecognition?: new () => SpeechRecognition
         SpeechRecognition?: new () => SpeechRecognition
-      }).webkitSpeechRecognition || window.SpeechRecognition
+      }).webkitSpeechRecognition || (window as unknown as { SpeechRecognition?: new () => SpeechRecognition }).SpeechRecognition
 
     if (SpeechRecognitionConstructor) {
       const recognition = new SpeechRecognitionConstructor()
@@ -38,6 +37,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
 
         setTimeout(() => {
           setMessages((prev) => [...prev, `🧑‍💼: ${spoken}`])
+
           fetch('https://serine-backend-production.up.railway.app/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -56,12 +56,12 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
       }
 
       recognition.onend = () => {
-        (recognition as any).started = false
+        if (recognitionRef.current) recognitionRef.current.started = false
       }
 
       recognitionRef.current = recognition
     }
-  }, [lang])
+  }, [lang, voiceEnabled])
 
   const handleSend = async () => {
     if (!input.trim()) return
@@ -76,7 +76,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
-          userId: '6f3b81a4-57f2-4f20-b356-f473bb36de91', // your user ID
+          userId: '6f3b81a4-57f2-4f20-b356-f473bb36de91', // Replace with dynamic user ID
         }),
       })
 
@@ -94,10 +94,12 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
   }
 
   const startVoice = () => {
-    if (recognitionRef.current && (recognitionRef.current as any).started) return
+    const recognition = recognitionRef.current
+    if (!recognition || recognition.started) return
+
     try {
-      recognitionRef.current?.start()
-      ;(recognitionRef.current as any).started = true
+      recognition.start()
+      recognition.started = true
     } catch {
       console.warn('Speech already started or not supported.')
     }
