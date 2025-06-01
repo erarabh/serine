@@ -1,4 +1,3 @@
-// ✅ File: /app/embed/page.tsx
 'use client'
 
 import { useState } from 'react'
@@ -6,19 +5,24 @@ import { useSearchParams } from 'next/navigation'
 
 type Sender = 'user' | 'bot'
 
+interface Message {
+  sender: Sender
+  text: string
+}
+
 export default function EmbedChatbot() {
   const searchParams = useSearchParams()
   const userId = searchParams.get('uid')
 
   const [message, setMessage] = useState('')
-  const [chat, setChat] = useState<{ sender: Sender; text: string }[]>([])
+  const [chat, setChat] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
 
   const sendMessage = async () => {
     if (!message.trim()) return
     if (!userId) return alert('Missing user ID')
 
-    const newChat = [...chat, { sender: 'user', text: message }]
+    const newChat: Message[] = [...chat, { sender: 'user', text: message }]
     setChat(newChat)
     setMessage('')
     setLoading(true)
