@@ -12,41 +12,11 @@ interface Props {
 
 type ChatMessage = { sender: 'user' | 'bot'; text: string }
 
-// ✅ Fix typing issue: declare SpeechRecognition in global scope
+// This declaration avoids ESLint errors with explicit 'any'
 declare global {
   interface Window {
-    webkitSpeechRecognition?: typeof SpeechRecognition
-    SpeechRecognition?: typeof SpeechRecognition
-  }
-
-  interface SpeechRecognition extends EventTarget {
-    lang: string
-    interimResults: boolean
-    start(): void
-    stop(): void
-    onresult: ((event: SpeechRecognitionEvent) => void) | null
-    onend: (() => void) | null
-    [key: string]: any
-  }
-
-  interface SpeechRecognitionEvent extends Event {
-    results: SpeechRecognitionResultList
-  }
-
-  interface SpeechRecognitionResultList {
-    [index: number]: SpeechRecognitionResult
-    length: number
-  }
-
-  interface SpeechRecognitionResult {
-    [index: number]: SpeechRecognitionAlternative
-    length: number
-    isFinal: boolean
-  }
-
-  interface SpeechRecognitionAlternative {
-    transcript: string
-    confidence: number
+    webkitSpeechRecognition: any
+    SpeechRecognition: any
   }
 }
 
@@ -60,7 +30,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
 
   useEffect(() => {
     const SpeechRecognitionConstructor =
-      window.SpeechRecognition || window.webkitSpeechRecognition
+      window.webkitSpeechRecognition || window.SpeechRecognition
 
     if (SpeechRecognitionConstructor) {
       const recognition = new SpeechRecognitionConstructor()
@@ -68,7 +38,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
       recognition.interimResults = false
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
-  const spoken = event.results[0][0].transcript
+        const spoken = event.results[0][0].transcript
         setInput(spoken)
 
         setTimeout(() => {
