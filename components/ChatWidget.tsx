@@ -5,6 +5,16 @@ import { ui, defaultLang, Language } from '@/lib/i18n'
 import ToggleVoice from '@/components/ToggleVoice'
 import { isVoiceAllowed } from '@/utils/planCheck'
 
+// Fix for missing type during SSR build
+declare global {
+  interface Window {
+    webkitSpeechRecognition: any
+    SpeechRecognition: any
+  }
+}
+
+type SpeechRecognition = any
+
 interface Props {
   lang?: Language
   userPlan?: string
@@ -21,22 +31,19 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
 
   useEffect(() => {
     const SpeechRecognitionConstructor =
-      (window as unknown as {
-        webkitSpeechRecognition?: new () => SpeechRecognition
-        SpeechRecognition?: new () => SpeechRecognition
-      }).webkitSpeechRecognition || (window as unknown as { SpeechRecognition?: new () => SpeechRecognition }).SpeechRecognition
+      window.webkitSpeechRecognition || window.SpeechRecognition
 
     if (SpeechRecognitionConstructor) {
       const recognition = new SpeechRecognitionConstructor()
       recognition.lang = lang
       recognition.interimResults = false
 
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
+      recognition.onresult = (event: any) => {
         const spoken = event.results[0][0].transcript
         setInput(spoken)
 
         setTimeout(() => {
-          setMessages((prev) => [...prev, `🧑‍💼: ${spoken}`])
+          setMessages((prev) => [...prev, { sender: 'user', text: spoken }])
 
           fetch('https://serine-backend-production.up.railway.app/chat', {
             method: 'POST',
@@ -45,7 +52,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
           })
             .then((res) => res.json())
             .then(({ reply }) => {
-              setMessages((prev) => [...prev, `🤖: ${reply}`])
+              setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
               if (voiceEnabled) {
                 const utterance = new SpeechSynthesisUtterance(reply)
                 utterance.lang = lang
@@ -67,7 +74,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
     if (!input.trim()) return
 
     const userMessage = input.trim()
-    setMessages((prev) => [...prev, `🧑‍💼: ${userMessage}`])
+    setMessages((prev) => [...prev, { sender: 'user', text: userMessage }])
     setInput('')
 
     try {
@@ -76,12 +83,12 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
-          userId: '6f3b81a4-57f2-4f20-b356-f473bb36de91', // Replace with dynamic user ID
+          userId: '6f3b81a4-57f2-4f20-b356-f473bb36de91',
         }),
       })
 
       const { reply } = await res.json()
-      setMessages((prev) => [...prev, `🤖: ${reply}`])
+      setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
 
       if (voiceEnabled) {
         const utterance = new SpeechSynthesisUtterance(reply)
@@ -89,7 +96,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
         speechSynthesis.speak(utterance)
       }
     } catch {
-      setMessages((prev) => [...prev, `⚠️: Server error or not connected.`])
+      setMessages((prev) => [...prev, { sender: 'bot', text: '⚠️: Server error or not connected.' }])
     }
   }
 
@@ -109,8 +116,13 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
     <div className="bg-white shadow-md rounded-lg p-4 space-y-4 border border-gray-300">
       <div className="h-64 overflow-y-auto space-y-2 text-black border p-2 rounded bg-gray-50">
         {messages.map((msg, idx) => (
-          <div key={idx} className="text-sm whitespace-pre-wrap">
-            {msg}
+          <div
+            key={idx}
+            className={`text-sm whitespace-pre-wrap ${
+              msg.sender === 'user' ? 'text-right text-purple-700' : 'text-left text-gray-800'
+            }`}
+          >
+            {msg.text}
           </div>
         ))}
       </div>
