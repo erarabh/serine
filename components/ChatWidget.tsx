@@ -12,8 +12,43 @@ interface Props {
 
 type ChatMessage = { sender: 'user' | 'bot'; text: string }
 
-// Declare compatible type for recognition constructor
-type RecognitionConstructor = new () => SpeechRecognition
+// ✅ Fix typing issue: declare SpeechRecognition in global scope
+declare global {
+  interface Window {
+    webkitSpeechRecognition?: typeof SpeechRecognition
+    SpeechRecognition?: typeof SpeechRecognition
+  }
+
+  interface SpeechRecognition extends EventTarget {
+    lang: string
+    interimResults: boolean
+    start(): void
+    stop(): void
+    onresult: ((event: SpeechRecognitionEvent) => void) | null
+    onend: (() => void) | null
+    [key: string]: any
+  }
+
+  interface SpeechRecognitionEvent extends Event {
+    results: SpeechRecognitionResultList
+  }
+
+  interface SpeechRecognitionResultList {
+    [index: number]: SpeechRecognitionResult
+    length: number
+  }
+
+  interface SpeechRecognitionResult {
+    [index: number]: SpeechRecognitionAlternative
+    length: number
+    isFinal: boolean
+  }
+
+  interface SpeechRecognitionAlternative {
+    transcript: string
+    confidence: number
+  }
+}
 
 const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -25,8 +60,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
 
   useEffect(() => {
     const SpeechRecognitionConstructor =
-      (window as unknown as { webkitSpeechRecognition?: RecognitionConstructor }).webkitSpeechRecognition ||
-      (window as unknown as { SpeechRecognition?: RecognitionConstructor }).SpeechRecognition
+      window.SpeechRecognition || window.webkitSpeechRecognition
 
     if (SpeechRecognitionConstructor) {
       const recognition = new SpeechRecognitionConstructor()
