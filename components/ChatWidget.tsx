@@ -10,15 +10,27 @@ import { isVoiceAllowed } from '@/utils/planCheck'
 interface Props {
   lang?: Language
   userPlan?: string
+  userId?: string
 }
+
 
 type ChatMessage = { sender: 'user' | 'bot'; text: string }
 
-type RecognitionConstructor = new () => SpeechRecognition;
+declare global {
+  interface Window {
+    SpeechRecognition?: typeof window.SpeechRecognition;
+    webkitSpeechRecognition?: typeof window.webkitSpeechRecognition;
+  }
+}
+
+// Prevent TypeScript treating this file as a module
+export {};
+
+
 
 const SpeechRecognitionConstructor =
   typeof window !== 'undefined' &&
-  (window.SpeechRecognition || window.webkitSpeechRecognition) as RecognitionConstructor | undefined;
+  (window.SpeechRecognition || window.webkitSpeechRecognition);
 
 if (SpeechRecognitionConstructor) {
   const recognition = new SpeechRecognitionConstructor()
@@ -28,12 +40,14 @@ if (SpeechRecognitionConstructor) {
 
 
 
-const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
+const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [voiceEnabled, setVoiceEnabled] = useState(true)
 
-  const recognitionRef = useRef<SpeechRecognition & { started?: boolean } | null>(null)
+
+const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.webkitSpeechRecognition) & { started?: boolean } | null>(null);
+
   const t = ui[lang]
 
   useEffect(() => {
@@ -45,7 +59,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
       recognition.lang = lang
       recognition.interimResults = false
 
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
+      recognition.onresult = (event: Event & { results: SpeechRecognitionResultList }) => {
         const spoken = event.results[0][0].transcript
         setInput(spoken)
 
@@ -90,7 +104,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
-          userId: '6f3b81a4-57f2-4f20-b356-f473bb36de91',
+          userId,
         }),
       })
 

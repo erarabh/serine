@@ -1,8 +1,9 @@
-export {}
-
 declare global {
   interface Window {
-    webkitSpeechRecognition?: new () => SpeechRecognition
-    SpeechRecognition?: new () => SpeechRecognition
+    SpeechRecognition?: typeof window.SpeechRecognition;
+    webkitSpeechRecognition?: typeof window.webkitSpeechRecognition;
   }
 }
+
+// Prevent TypeScript from treating this file as a module
+export {};

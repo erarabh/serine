@@ -26,7 +26,10 @@
     "typescript": "^5"
   },
   "scripts": {
-  "build": "next build --no-lint && tsc --noEmit || true"
-  }
+  "dev": "next dev",
+  "build": "next build --no-lint && tsc --noEmit || exit 0",
+  "start": "next start",
+  "lint": "next lint"
+}
 
 }
