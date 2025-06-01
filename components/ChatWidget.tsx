@@ -11,7 +11,7 @@ interface Props {
 }
 
 const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
-  const [messages, setMessages] = useState<string[]>([])
+  const [messages, setMessages] = useState<{ sender: 'user' | 'bot'; text: string }[]>([])
   const [input, setInput] = useState('')
   const [voiceEnabled, setVoiceEnabled] = useState(true)
 

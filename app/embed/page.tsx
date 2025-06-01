@@ -16,7 +16,7 @@ export default function EmbedChatbot() {
     if (!message.trim()) return
     if (!userId) return alert('Missing user ID')
 
-    const newChat = [...chat, { sender: 'user', text: message }]
+    const newChat = [...chat, { sender: 'user' as const, text: message }]
     setChat(newChat)
     setMessage('')
     setLoading(true)
@@ -30,10 +30,10 @@ export default function EmbedChatbot() {
 
       const data = await res.json()
       const reply = data?.reply || 'Sorry, I could not understand.'
-      setChat([...newChat, { sender: 'bot', text: reply }])
+      setChat([...newChat, { sender: 'bot' as const, text: reply }])
     } catch (err) {
       console.error('❌ Chat error:', err)
-      setChat([...newChat, { sender: 'bot', text: '❌ Failed to get a response.' }])
+      setChat([...newChat, { sender: 'bot' as const, text: '❌ Failed to get a response.' }])
     }
 
     setLoading(false)
