@@ -14,12 +14,11 @@ interface Props {
 
 type ChatMessage = { sender: 'user' | 'bot'; text: string }
 
-declare global {
-  interface Window {
-    webkitSpeechRecognition: any
-    SpeechRecognition: any
-  }
-}
+type RecognitionConstructor = new () => SpeechRecognition;
+
+const SpeechRecognitionConstructor =
+  (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+
 
 
 const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
