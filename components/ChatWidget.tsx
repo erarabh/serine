@@ -5,27 +5,30 @@ import { ui, defaultLang, Language } from '@/lib/i18n'
 import ToggleVoice from '@/components/ToggleVoice'
 import { isVoiceAllowed } from '@/utils/planCheck'
 
-const ChatWidget = ({
-  lang = defaultLang,
-  userPlan = 'pro',
-}: {
+interface Props {
   lang?: Language
   userPlan?: string
-}) => {
+}
+
+const ChatWidget = ({ lang = defaultLang, userPlan = 'pro' }: Props) => {
   const [messages, setMessages] = useState<string[]>([])
   const [input, setInput] = useState('')
   const [voiceEnabled, setVoiceEnabled] = useState(true)
+
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   const t = ui[lang]
 
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognitionClass =
-        (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition ||
-        window.SpeechRecognition
+    // Setup voice recognition
+    const SpeechRecognitionConstructor =
+      (window as typeof window & {
+        webkitSpeechRecognition?: new () => SpeechRecognition
+        SpeechRecognition?: new () => SpeechRecognition
+      }).webkitSpeechRecognition || window.SpeechRecognition
 
-      const recognition = new SpeechRecognitionClass()
+    if (SpeechRecognitionConstructor) {
+      const recognition = new SpeechRecognitionConstructor()
       recognition.lang = lang
       recognition.interimResults = false
 
@@ -41,7 +44,7 @@ const ChatWidget = ({
             body: JSON.stringify({ message: spoken }),
           })
             .then((res) => res.json())
-            .then(({ reply }: { reply: string }) => {
+            .then(({ reply }) => {
               setMessages((prev) => [...prev, `🤖: ${reply}`])
               if (voiceEnabled) {
                 const utterance = new SpeechSynthesisUtterance(reply)
@@ -58,10 +61,11 @@ const ChatWidget = ({
 
       recognitionRef.current = recognition
     }
-  }, [lang, voiceEnabled])
+  }, [lang])
 
   const handleSend = async () => {
     if (!input.trim()) return
+
     const userMessage = input.trim()
     setMessages((prev) => [...prev, `🧑‍💼: ${userMessage}`])
     setInput('')
@@ -72,11 +76,11 @@ const ChatWidget = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
-          userId: '6f3b81a4-57f2-4f20-b356-f473bb36de91',
+          userId: '6f3b81a4-57f2-4f20-b356-f473bb36de91', // your user ID
         }),
       })
 
-      const { reply }: { reply: string } = await res.json()
+      const { reply } = await res.json()
       setMessages((prev) => [...prev, `🤖: ${reply}`])
 
       if (voiceEnabled) {
