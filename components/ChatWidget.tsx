@@ -17,7 +17,14 @@ type ChatMessage = { sender: 'user' | 'bot'; text: string }
 type RecognitionConstructor = new () => SpeechRecognition;
 
 const SpeechRecognitionConstructor =
-  (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+  typeof window !== 'undefined' &&
+  (window.SpeechRecognition || window.webkitSpeechRecognition) as RecognitionConstructor | undefined;
+
+if (SpeechRecognitionConstructor) {
+  const recognition = new SpeechRecognitionConstructor()
+  // ...
+}
+
 
 
 
