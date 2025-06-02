@@ -1,6 +1,6 @@
 'use client'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */ // ✅ temporary bypass for browser speech types
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useRef, useState } from 'react'
 import { ui, defaultLang, Language } from '@/lib/i18n'
@@ -11,44 +11,48 @@ interface Props {
   lang?: Language
   userPlan?: string
   userId?: string
+  customQA?: { question: string; answer: string }[] // ✅ New
 }
-
 
 type ChatMessage = { sender: 'user' | 'bot'; text: string }
 
 declare global {
   interface Window {
-    SpeechRecognition?: typeof window.SpeechRecognition;
-    webkitSpeechRecognition?: typeof window.webkitSpeechRecognition;
+    SpeechRecognition?: typeof window.SpeechRecognition
+    webkitSpeechRecognition?: typeof window.webkitSpeechRecognition
   }
 }
 
-// Prevent TypeScript treating this file as a module
-export {};
+export {}
 
-
-
-const SpeechRecognitionConstructor =
-  typeof window !== 'undefined' &&
-  (window.SpeechRecognition || window.webkitSpeechRecognition);
-
-if (SpeechRecognitionConstructor) {
-  const recognition = new SpeechRecognitionConstructor()
-  // ...
-}
-
-
-
-
-const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => {
+const ChatWidget = ({
+  lang = defaultLang,
+  userPlan = 'pro',
+  userId,
+  customQA = []
+}: Props) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [voiceEnabled, setVoiceEnabled] = useState(true)
 
-
-const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.webkitSpeechRecognition) & { started?: boolean } | null>(null);
+  const recognitionRef = useRef<
+    (typeof window.SpeechRecognition | typeof window.webkitSpeechRecognition) & {
+      started?: boolean
+    } | null
+  >(null)
 
   const t = ui[lang]
+
+  // ✅ Preload Q&A pairs if available (like from EmbedChatbot)
+  useEffect(() => {
+    if (customQA.length > 0) {
+      const preloadedMessages = customQA.map((pair) => ({
+        sender: 'bot',
+        text: `Q: ${pair.question}\nA: ${pair.answer}`
+      }))
+      setMessages(preloadedMessages)
+    }
+  }, [customQA])
 
   useEffect(() => {
     const SpeechRecognitionConstructor =
@@ -69,7 +73,7 @@ const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.w
           fetch('https://serine-backend-production.up.railway.app/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: spoken }),
+            body: JSON.stringify({ message: spoken, userId }),
           })
             .then((res) => res.json())
             .then(({ reply }: { reply: string }) => {
@@ -117,7 +121,10 @@ const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.w
         speechSynthesis.speak(utterance)
       }
     } catch {
-      setMessages((prev) => [...prev, { sender: 'bot', text: '⚠️: Server error or not connected.' }])
+      setMessages((prev) => [
+        ...prev,
+        { sender: 'bot', text: '⚠️: Server error or not connected.' },
+      ])
     }
   }
 
