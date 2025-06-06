@@ -35,6 +35,10 @@ export const ui = {
     question: "Question",
     answer: "Réponse",
     add: "➕ Ajouter Q&R",
+	added: "Ajouté !", // ✅ Add this line
+    failedToAdd: "Échec de l'ajout",
+    storedPairs: "Paires enregistrées",
+    noPairs: "Aucune paire Q&R trouvée.",										
     delete: "❌ Supprimer",
   },
   ar: {
@@ -46,6 +50,10 @@ export const ui = {
     question: "سؤال",
     answer: "إجابة",
     add: "➕ أضف سؤال/جواب",
+	added: "تمت الإضافة!", // ✅ Add this line
+	failedToAdd: "فشل في الإضافة",
+    storedPairs: "الأسئلة والأجوبة المخزنة",
+    noPairs: "لم يتم العثور على أسئلة وأجوبة.",
     delete: "❌ حذف",
   }
 }
