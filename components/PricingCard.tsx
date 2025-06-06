@@ -4,6 +4,7 @@ import Link from 'next/link'
 interface Props {
   title: string
   price: string
+  popular?: boolean; // ← Add this line
   features: string[]
   buttonLabel: string
   buttonHref?: string
