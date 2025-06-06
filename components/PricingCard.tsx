@@ -8,6 +8,7 @@ interface Props {
   features: string[]
   buttonLabel: string
   buttonHref?: string
+  onClick?: () => void; // ← Add this line
 }
 
 export default function PricingCard({
