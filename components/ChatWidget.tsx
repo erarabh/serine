@@ -11,7 +11,7 @@ interface Props {
   lang?: Language
   userPlan?: string
   userId?: string
-  customQA?: { question: string; answer: string }[] // ✅ New
+  customQA?: { question: string; answer: string }[]
 }
 
 type ChatMessage = { sender: 'user' | 'bot'; text: string }
@@ -34,6 +34,8 @@ const ChatWidget = ({
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [voiceEnabled, setVoiceEnabled] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const chatRef = useRef<HTMLDivElement>(null)
 
   const recognitionRef = useRef<
     (typeof window.SpeechRecognition | typeof window.webkitSpeechRecognition) & {
@@ -43,25 +45,32 @@ const ChatWidget = ({
 
   const t = ui[lang]
 
-  // ✅ Preload Q&A pairs if available (like from EmbedChatbot)
+  // Auto-scroll on message update
   useEffect(() => {
-  if (customQA.length > 0) {
-    const preloadedMessages: ChatMessage[] = customQA.map((pair) => ({
-      sender: 'bot' as 'bot',
-      text: `Q: ${pair.question}\nA: ${pair.answer}`,
-    }))
-    setMessages(preloadedMessages)
-  }
-}, [customQA])
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight
+    }
+  }, [messages])
 
+  // Preload custom Q&A
+  useEffect(() => {
+    if (customQA.length > 0) {
+      const preloadedMessages: ChatMessage[] = customQA.map((pair) => ({
+        sender: 'bot' as 'bot',
+        text: `Q: ${pair.question}\nA: ${pair.answer}`,
+      }))
+      setMessages(preloadedMessages)
+    }
+  }, [customQA])
 
+  // Voice recognition init
   useEffect(() => {
     const SpeechRecognitionConstructor =
       window.webkitSpeechRecognition || window.SpeechRecognition
 
     if (SpeechRecognitionConstructor) {
       const recognition = new SpeechRecognitionConstructor()
-      recognition.lang = lang
+      recognition.lang = lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar-EG' : 'en-US'
       recognition.interimResults = false
 
       recognition.onresult = (event: Event & { results: SpeechRecognitionResultList }) => {
@@ -70,18 +79,22 @@ const ChatWidget = ({
 
         setTimeout(() => {
           setMessages((prev) => [...prev, { sender: 'user', text: spoken }])
+          setLoading(true)
 
-          fetch('https://serine-backend-production.up.railway.app/chat', {
+          fetch('https://serine-backend.onrender.com/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: spoken, userId }),
+            body: JSON.stringify({ message: spoken, userId, lang }),
           })
             .then((res) => res.json())
             .then(({ reply }: { reply: string }) => {
-              setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
+              const safeReply = reply && reply !== 'undefined' ? reply : '🤖 Sorry, I didn\'t understand that.'
+              setMessages((prev) => [...prev, { sender: 'bot', text: safeReply }])
+              setLoading(false)
+
               if (voiceEnabled) {
-                const utterance = new SpeechSynthesisUtterance(reply)
-                utterance.lang = lang
+                const utterance = new SpeechSynthesisUtterance(safeReply)
+                utterance.lang = lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar-EG' : 'en-US'
                 speechSynthesis.speak(utterance)
               }
             })
@@ -102,30 +115,36 @@ const ChatWidget = ({
     const userMessage = input.trim()
     setMessages((prev) => [...prev, { sender: 'user', text: userMessage }])
     setInput('')
+    setLoading(true)
 
     try {
-      const res = await fetch('https://serine-backend-production.up.railway.app/chat', {
+      const res = await fetch('https://serine-backend.onrender.com/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
           userId,
+          lang,
         }),
       })
 
       const { reply }: { reply: string } = await res.json()
-      setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
+      const safeReply = reply && reply !== 'undefined' ? reply : '🤖 Sorry, I didn\'t understand that.'
+
+      setMessages((prev) => [...prev, { sender: 'bot', text: safeReply }])
+      setLoading(false)
 
       if (voiceEnabled) {
-        const utterance = new SpeechSynthesisUtterance(reply)
-        utterance.lang = lang
+        const utterance = new SpeechSynthesisUtterance(safeReply)
+        utterance.lang = lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar-EG' : 'en-US'
         speechSynthesis.speak(utterance)
       }
     } catch {
       setMessages((prev) => [
         ...prev,
-        { sender: 'bot', text: '⚠️: Server error or not connected.' },
+        { sender: 'bot', text: '⚠️ Server error or not connected.' },
       ])
+      setLoading(false)
     }
   }
 
@@ -143,12 +162,16 @@ const ChatWidget = ({
 
   return (
     <div className="bg-white shadow-md rounded-lg p-4 space-y-4 border border-gray-300">
-      <div className="h-64 overflow-y-auto space-y-2 text-black border p-2 rounded bg-gray-50">
+      <div
+        ref={chatRef}
+        className="h-64 overflow-y-auto space-y-2 text-black border p-2 rounded bg-gray-50"
+      >
         {messages.map((msg, idx) => (
           <div key={idx} className="text-sm whitespace-pre-wrap">
             {msg.sender === 'user' ? `🧑‍💼: ${msg.text}` : `🤖: ${msg.text}`}
           </div>
         ))}
+        {loading && <div className="text-sm text-gray-500">🤖: Typing...</div>}
       </div>
 
       <div className="flex space-x-2 items-center">

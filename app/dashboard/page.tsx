@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import QADashboard from '@/components/QADashboard'
 import AuthBox from '@/components/AuthBox'
+import LangSelector from '@/components/LangSelector'
+import { Language, defaultLang } from '@/lib/i18n'
 
 export default function Dashboard() {
   const [url, setUrl] = useState('')
@@ -11,6 +13,7 @@ export default function Dashboard() {
   const [userId, setUserId] = useState('')
   const [plan, setPlan] = useState('free')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [lang, setLang] = useState<Language>(defaultLang)
 
   useEffect(() => {
     const getSession = async () => {
@@ -24,18 +27,12 @@ export default function Dashboard() {
         setIsAuthenticated(true)
 
         try {
-          const res = await fetch(`https://serine-backend-production.up.railway.app/users/${user.id}`)
-
-          if (!res.ok) {
-            console.warn(`User not found (code ${res.status}). Skipping user creation.`)
-            setPlan('free')
-            return
-          }
+          const res = await fetch(`https://serine-backend.onrender.com/users/${user.id}`)
+          if (!res.ok) return setPlan('free')
 
           const data = await res.json()
           setPlan(data?.plan || 'free')
-        } catch (err) {
-          console.error('❌ Error fetching user plan:', err)
+        } catch {
           setPlan('free')
         }
       } else {
@@ -47,26 +44,21 @@ export default function Dashboard() {
   }, [])
 
   const handleScrapeAndTrain = async () => {
-  if (plan !== 'pro') {
-    setStatus('🚫 Scraping requires Pro plan.')
-    return
+    if (plan !== 'pro') {
+      setStatus('🚫 Scraping requires Pro plan.')
+      return
+    }
+
+    setStatus('🔍 Scraping...')
+    const scrapeRes = await fetch('https://serine-backend.onrender.com/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, userId }),
+    })
+
+    const result = await scrapeRes.json()
+    setStatus(result.success ? `✅ Finished! Added ${result.count} Q&A.` : '❌ Scrape or upload failed.')
   }
-
-  setStatus('🔍 Scraping...')
-  const scrapeRes = await fetch('https://serine-backend-production.up.railway.app/scrape', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, userId }), // ✅ send userId!
-  })
-
-  const result = await scrapeRes.json()
-  if (!scrapeRes.ok || !result.success) {
-    setStatus('❌ Scrape or upload failed.')
-    return
-  }
-
-  setStatus(`✅ Finished! Added ${result.count} Q&A.`)
-}
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -81,12 +73,15 @@ export default function Dashboard() {
         <>
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">📊 Dashboard</h1>
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
-            >
-              🚪 Log Out
-            </button>
+            <div className="flex gap-4 items-center">
+              <LangSelector onChange={setLang} />
+              <button
+                onClick={handleLogout}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+              >
+                🚪 Log Out
+              </button>
+            </div>
           </div>
 
           {/* Scrape + Upload */}
@@ -111,7 +106,7 @@ export default function Dashboard() {
           </div>
 
           {/* Manual Q&A Entry */}
-          <QADashboard userId={userId} />
+          <QADashboard userId={userId} lang={lang} />
         </>
       )}
     </div>

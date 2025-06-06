@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { ui, Language, defaultLang } from '@/lib/i18n'
 
 interface QAPair {
   id: string
@@ -8,16 +9,23 @@ interface QAPair {
   answer: string
 }
 
-export default function QADashboard({ userId }: { userId: string }) {
+interface Props {
+  userId: string
+  lang?: Language
+}
+
+export default function QADashboard({ userId, lang = defaultLang }: Props) {
   const [qaPairs, setQaPairs] = useState<QAPair[]>([])
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
   const [status, setStatus] = useState('')
 
-  // ✅ Load Q&A on mount or userId change
+  const t = ui[lang]
+  console.log('✅ QA fetch userId:', userId)
+  
   useEffect(() => {
     if (!userId) return
-    fetch(`https://serine-backend-production.up.railway.app/qa/${userId}`)
+    fetch(`https://serine-backend.onrender.com/qa/${userId}`)
       .then(res => res.json())
       .then(data => setQaPairs(data.data || []))
       .catch(err => {
@@ -29,7 +37,7 @@ export default function QADashboard({ userId }: { userId: string }) {
     if (!question || !answer || !userId) return
     setStatus('Adding...')
 
-    const res = await fetch('https://serine-backend-production.up.railway.app/qa', {
+    const res = await fetch('https://serine-backend.onrender.com/qa', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, question, answer }),
@@ -41,14 +49,14 @@ export default function QADashboard({ userId }: { userId: string }) {
       setQaPairs(prev => [...prev, { id: result.insertedId, question, answer }])
       setQuestion('')
       setAnswer('')
-      setStatus('✅ Added!')
+      setStatus('✅ ' + (t.added || 'Added!'))
     } else {
-      setStatus('❌ Failed to add')
+      setStatus('❌ ' + (t.failedToAdd || 'Failed to add'))
     }
   }
 
   const handleDelete = async (id: string) => {
-    await fetch(`https://serine-backend-production.up.railway.app/qa/${id}`, {
+    await fetch(`https://serine-backend.onrender.com/qa/${id}`, {
       method: 'DELETE',
     })
     setQaPairs(prev => prev.filter(q => q.id !== id))
@@ -56,18 +64,18 @@ export default function QADashboard({ userId }: { userId: string }) {
 
   return (
     <div className="bg-white p-6 rounded shadow-md space-y-4">
-      <h2 className="text-xl font-semibold">✍️ Manual Q&A Manager</h2>
+      <h2 className="text-xl font-semibold">{t.manualQATitle || '✍️ Manual Q&A Manager'}</h2>
 
       <div className="space-y-2">
         <input
           className="w-full border px-3 py-2 rounded"
-          placeholder="Question"
+          placeholder={t.question || 'Question'}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
         />
         <textarea
           className="w-full border px-3 py-2 rounded"
-          placeholder="Answer"
+          placeholder={t.answer || 'Answer'}
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
         />
@@ -75,7 +83,7 @@ export default function QADashboard({ userId }: { userId: string }) {
           onClick={handleAdd}
           className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
         >
-          ➕ Add Q&A
+          {t.add || '➕ Add Q&A'}
         </button>
         {status && <p className="text-sm text-gray-700">{status}</p>}
       </div>
@@ -83,9 +91,9 @@ export default function QADashboard({ userId }: { userId: string }) {
       <hr />
 
       <div className="space-y-2">
-        <h3 className="font-medium">🧠 Stored Pairs</h3>
+        <h3 className="font-medium">{t.storedPairs || '🧠 Stored Pairs'}</h3>
         {qaPairs.length === 0 ? (
-          <p className="text-gray-500">No Q&A pairs found.</p>
+          <p className="text-gray-500">{t.noPairs || 'No Q&A pairs found.'}</p>
         ) : (
           qaPairs.map((qa) => (
             <div key={qa.id} className="border p-3 bg-gray-50 rounded">
@@ -95,7 +103,7 @@ export default function QADashboard({ userId }: { userId: string }) {
                 className="text-xs text-red-500 hover:underline"
                 onClick={() => handleDelete(qa.id)}
               >
-                ❌ Delete
+                {t.delete || '❌ Delete'}
               </button>
             </div>
           ))
