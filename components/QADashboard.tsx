@@ -25,6 +25,7 @@ export default function QADashboard({ userId }: { userId: string }) {
       .catch((err) => {
         console.error('❌ Error fetching Q&A:', err);
       });
+	  console.log('📌 QADashboard mounted with userId:', userId)
   }, [userId]);
 
   const handleAdd = async () => {
@@ -38,7 +39,7 @@ export default function QADashboard({ userId }: { userId: string }) {
     });
 
     const result = await res.json();
-
+    console.log('📬 Q&A POST result:', result)
     if (result.success && result.insertedId) {
       setQaPairs((prev) => [...prev, { id: result.insertedId, question, answer }]);
       setQuestion('');
