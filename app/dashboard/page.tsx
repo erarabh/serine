@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import QADashboard from '@/components/QADashboard'
 import AuthBox from '@/components/AuthBox'
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
+
 export default function Dashboard() {
   const [url, setUrl] = useState('')
   const [status, setStatus] = useState('')
@@ -13,18 +15,28 @@ export default function Dashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    const getSession = async () => {
+    const initAuth = async () => {
+      // Try to get session first
       const {
         data: { session },
       } = await supabase.auth.getSession()
 
-      if (session?.user) {
-        const user = session.user
+      let user = session?.user
+
+      // If no user from session, fallback to getUser()
+      if (!user) {
+        const {
+          data: { user: fallbackUser },
+        } = await supabase.auth.getUser()
+        user = fallbackUser
+      }
+
+      if (user) {
         setUserId(user.id)
         setIsAuthenticated(true)
 
         try {
-          const res = await fetch(`https://serine-backend-production.up.railway.app/users/${user.id}`)
+          const res = await fetch(`${BACKEND_URL}/users/${user.id}`)
 
           if (!res.ok) {
             console.warn(`User not found (code ${res.status}). Skipping user creation.`)
@@ -43,30 +55,30 @@ export default function Dashboard() {
       }
     }
 
-    getSession()
+    initAuth()
   }, [])
 
   const handleScrapeAndTrain = async () => {
-  if (plan !== 'pro') {
-    setStatus('🚫 Scraping requires Pro plan.')
-    return
+    if (plan !== 'pro') {
+      setStatus('🚫 Scraping requires Pro plan.')
+      return
+    }
+
+    setStatus('🔍 Scraping...')
+    const scrapeRes = await fetch(`${BACKEND_URL}/scrape`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, userId }), // ✅ send userId!
+    })
+
+    const result = await scrapeRes.json()
+    if (!scrapeRes.ok || !result.success) {
+      setStatus('❌ Scrape or upload failed.')
+      return
+    }
+
+    setStatus(`✅ Finished! Added ${result.count} Q&A.`)
   }
-
-  setStatus('🔍 Scraping...')
-  const scrapeRes = await fetch('https://serine-backend-production.up.railway.app/scrape', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, userId }), // ✅ send userId!
-  })
-
-  const result = await scrapeRes.json()
-  if (!scrapeRes.ok || !result.success) {
-    setStatus('❌ Scrape or upload failed.')
-    return
-  }
-
-  setStatus(`✅ Finished! Added ${result.count} Q&A.`)
-}
 
   const handleLogout = async () => {
     await supabase.auth.signOut()

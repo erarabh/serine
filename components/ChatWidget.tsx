@@ -1,6 +1,5 @@
+// ✅ File: frontend/components/ChatWidget.tsx
 'use client'
-
-/* eslint-disable @typescript-eslint/no-explicit-any */ // ✅ temporary bypass for browser speech types
 
 import { useEffect, useRef, useState } from 'react'
 import { ui, defaultLang, Language } from '@/lib/i18n'
@@ -13,40 +12,22 @@ interface Props {
   userId?: string
 }
 
-
 type ChatMessage = { sender: 'user' | 'bot'; text: string }
 
 declare global {
   interface Window {
-    SpeechRecognition?: typeof window.SpeechRecognition;
-    webkitSpeechRecognition?: typeof window.webkitSpeechRecognition;
+    SpeechRecognition?: typeof window.SpeechRecognition
+    webkitSpeechRecognition?: typeof window.webkitSpeechRecognition
   }
 }
 
-// Prevent TypeScript treating this file as a module
-export {};
-
-
-
-const SpeechRecognitionConstructor =
-  typeof window !== 'undefined' &&
-  (window.SpeechRecognition || window.webkitSpeechRecognition);
-
-if (SpeechRecognitionConstructor) {
-  const recognition = new SpeechRecognitionConstructor()
-  // ...
-}
-
-
-
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
 
 const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [voiceEnabled, setVoiceEnabled] = useState(true)
-
-
-const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.webkitSpeechRecognition) & { started?: boolean } | null>(null);
+  const recognitionRef = useRef<any>(null)
 
   const t = ui[lang]
 
@@ -59,26 +40,30 @@ const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.w
       recognition.lang = lang
       recognition.interimResults = false
 
-      recognition.onresult = (event: Event & { results: SpeechRecognitionResultList }) => {
+      recognition.onresult = (event: any) => {
         const spoken = event.results[0][0].transcript
         setInput(spoken)
 
         setTimeout(() => {
           setMessages((prev) => [...prev, { sender: 'user', text: spoken }])
 
-          fetch('https://serine-backend-production.up.railway.app/chat', {
+          fetch(`${BACKEND_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: spoken }),
+            body: JSON.stringify({ message: spoken, userId }),
           })
             .then((res) => res.json())
-            .then(({ reply }: { reply: string }) => {
+            .then(({ reply }) => {
               setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
               if (voiceEnabled) {
                 const utterance = new SpeechSynthesisUtterance(reply)
                 utterance.lang = lang
                 speechSynthesis.speak(utterance)
               }
+            })
+            .catch((err) => {
+              console.error('❌ Chat fetch error:', err)
+              setMessages((prev) => [...prev, { sender: 'bot', text: '⚠️ Server error or not connected.' }])
             })
         }, 1000)
       }
@@ -99,16 +84,13 @@ const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.w
     setInput('')
 
     try {
-      const res = await fetch('https://serine-backend-production.up.railway.app/chat', {
+      const res = await fetch(`${BACKEND_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          userId,
-        }),
+        body: JSON.stringify({ message: userMessage, userId }),
       })
 
-      const { reply }: { reply: string } = await res.json()
+      const { reply } = await res.json()
       setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
 
       if (voiceEnabled) {
@@ -116,8 +98,9 @@ const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.w
         utterance.lang = lang
         speechSynthesis.speak(utterance)
       }
-    } catch {
-      setMessages((prev) => [...prev, { sender: 'bot', text: '⚠️: Server error or not connected.' }])
+    } catch (err) {
+      console.error('❌ Chat fetch error:', err)
+      setMessages((prev) => [...prev, { sender: 'bot', text: '⚠️ Server error or not connected.' }])
     }
   }
 
@@ -134,8 +117,8 @@ const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.w
   }
 
   return (
-    <div className="bg-white shadow-md rounded-lg p-4 space-y-4 border border-gray-300">
-      <div className="h-64 overflow-y-auto space-y-2 text-black border p-2 rounded bg-gray-50">
+    <div className="flex flex-col h-full max-h-full">
+      <div className="flex-1 overflow-y-auto space-y-2 text-black border-b p-2 bg-gray-50">
         {messages.map((msg, idx) => (
           <div key={idx} className="text-sm whitespace-pre-wrap">
             {msg.sender === 'user' ? `🧑‍💼: ${msg.text}` : `🤖: ${msg.text}`}
@@ -143,34 +126,34 @@ const recognitionRef = useRef<(typeof window.SpeechRecognition | typeof window.w
         ))}
       </div>
 
-      <div className="flex space-x-2 items-center">
-        {isVoiceAllowed(userPlan) && (
-          <button
-            className="px-3 py-2 bg-gray-100 text-purple-600 rounded hover:bg-gray-200"
-            onClick={startVoice}
-            title="Click to speak"
-          >
-            🎤
-          </button>
-        )}
-
-        <input
+      <div className="p-2 border-t bg-white">
+        <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          className="flex-1 border px-4 py-2 rounded text-black"
+          className="w-full border px-4 py-2 rounded text-black resize-none"
           placeholder={t.inputPlaceholder}
+          rows={2}
         />
-
-        <button
-          onClick={handleSend}
-          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-        >
-          {t.send}
-        </button>
-
-        {isVoiceAllowed(userPlan) && (
-          <ToggleVoice enabled={voiceEnabled} onToggle={setVoiceEnabled} />
-        )}
+        <div className="flex flex-wrap justify-between items-center gap-2 mt-2">
+          {isVoiceAllowed(userPlan) && (
+            <button
+              className="px-3 py-2 bg-gray-100 text-purple-600 rounded hover:bg-gray-200"
+              onClick={startVoice}
+              title="Click to speak"
+            >
+              🎤
+            </button>
+          )}
+          <button
+            onClick={handleSend}
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+          >
+            {t.send}
+          </button>
+          {isVoiceAllowed(userPlan) && (
+            <ToggleVoice enabled={voiceEnabled} onToggle={setVoiceEnabled} />
+          )}
+        </div>
       </div>
     </div>
   )

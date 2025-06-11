@@ -1,58 +1,60 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
 interface QAPair {
-  id: string
-  question: string
-  answer: string
+  id: string;
+  question: string;
+  answer: string;
 }
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+
 export default function QADashboard({ userId }: { userId: string }) {
-  const [qaPairs, setQaPairs] = useState<QAPair[]>([])
-  const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
-  const [status, setStatus] = useState('')
+  const [qaPairs, setQaPairs] = useState<QAPair[]>([]);
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [status, setStatus] = useState('');
 
   // ✅ Load Q&A on mount or userId change
   useEffect(() => {
-    if (!userId) return
-    fetch(`https://serine-backend-production.up.railway.app/qa/${userId}`)
-      .then(res => res.json())
-      .then(data => setQaPairs(data.data || []))
-      .catch(err => {
-        console.error('❌ Error fetching Q&A:', err)
-      })
-  }, [userId])
+    if (!userId) return;
+    fetch(`${BACKEND_URL}/qa/${userId}`)
+      .then((res) => res.json())
+      .then((data) => setQaPairs(data.data || []))
+      .catch((err) => {
+        console.error('❌ Error fetching Q&A:', err);
+      });
+  }, [userId]);
 
   const handleAdd = async () => {
-    if (!question || !answer || !userId) return
-    setStatus('Adding...')
+    if (!question || !answer || !userId) return;
+    setStatus('Adding...');
 
-    const res = await fetch('https://serine-backend-production.up.railway.app/qa', {
+    const res = await fetch(`${BACKEND_URL}/qa`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, question, answer }),
-    })
+    });
 
-    const result = await res.json()
+    const result = await res.json();
 
     if (result.success && result.insertedId) {
-      setQaPairs(prev => [...prev, { id: result.insertedId, question, answer }])
-      setQuestion('')
-      setAnswer('')
-      setStatus('✅ Added!')
+      setQaPairs((prev) => [...prev, { id: result.insertedId, question, answer }]);
+      setQuestion('');
+      setAnswer('');
+      setStatus('✅ Added!');
     } else {
-      setStatus('❌ Failed to add')
+      setStatus('❌ Failed to add');
     }
-  }
+  };
 
   const handleDelete = async (id: string) => {
-    await fetch(`https://serine-backend-production.up.railway.app/qa/${id}`, {
+    await fetch(`${BACKEND_URL}/qa/${id}`, {
       method: 'DELETE',
-    })
-    setQaPairs(prev => prev.filter(q => q.id !== id))
-  }
+    });
+    setQaPairs((prev) => prev.filter((q) => q.id !== id));
+  };
 
   return (
     <div className="bg-white p-6 rounded shadow-md space-y-4">
@@ -89,8 +91,12 @@ export default function QADashboard({ userId }: { userId: string }) {
         ) : (
           qaPairs.map((qa) => (
             <div key={qa.id} className="border p-3 bg-gray-50 rounded">
-              <p><strong>Q:</strong> {qa.question}</p>
-              <p><strong>A:</strong> {qa.answer}</p>
+              <p>
+                <strong>Q:</strong> {qa.question}
+              </p>
+              <p>
+                <strong>A:</strong> {qa.answer}
+              </p>
               <button
                 className="text-xs text-red-500 hover:underline"
                 onClick={() => handleDelete(qa.id)}
@@ -102,5 +108,5 @@ export default function QADashboard({ userId }: { userId: string }) {
         )}
       </div>
     </div>
-  )
+  );
 }
