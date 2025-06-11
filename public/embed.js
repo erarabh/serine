@@ -11,8 +11,11 @@
   `;
 
   // Create iframe (chat window)
-  const iframe = document.createElement('iframe');
+  const iframe = document.createElement('iframe')
+
+
   iframe.src = `https://serine.vercel.app/embed?uid=${userId}`;
+  iframe.allow = 'microphone' // ✅ this line allows voice inside iframe!					   
   iframe.style = `
 				  
 			   
