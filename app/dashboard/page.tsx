@@ -26,9 +26,13 @@ export default function Dashboard() {
       // If no user from session, fallback to getUser()
       if (!user) {
         const {
-          data: { user: fallbackUser },
-        } = await supabase.auth.getUser()
-        user = fallbackUser
+  data: { user: fallbackUser },
+} = await supabase.auth.getUser()
+
+if (fallbackUser) {
+  user = fallbackUser
+}
+
       }
 
       if (user) {
