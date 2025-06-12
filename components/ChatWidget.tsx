@@ -1,4 +1,4 @@
-// ✅ File: frontend/components/ChatWidget.tsx
+// ✅ frontend/components/ChatWidget.tsx
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -37,7 +37,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => 
 
     if (SpeechRecognitionConstructor) {
       const recognition = new SpeechRecognitionConstructor()
-      recognition.lang = lang
+      recognition.lang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US'
       recognition.interimResults = false
 
       recognition.onresult = (event: any) => {
@@ -50,14 +50,14 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => 
           fetch(`${BACKEND_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: spoken, userId }),
+            body: JSON.stringify({ message: spoken, userId, lang }),
           })
             .then((res) => res.json())
             .then(({ reply }) => {
               setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
               if (voiceEnabled) {
                 const utterance = new SpeechSynthesisUtterance(reply)
-                utterance.lang = lang
+                utterance.lang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US'
                 speechSynthesis.speak(utterance)
               }
             })
@@ -87,7 +87,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => 
       const res = await fetch(`${BACKEND_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage, userId }),
+        body: JSON.stringify({ message: userMessage, userId, lang }),
       })
 
       const { reply } = await res.json()
@@ -95,7 +95,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => 
 
       if (voiceEnabled) {
         const utterance = new SpeechSynthesisUtterance(reply)
-        utterance.lang = lang
+        utterance.lang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US'
         speechSynthesis.speak(utterance)
       }
     } catch (err) {
@@ -120,7 +120,11 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => 
     <div className="flex flex-col h-full max-h-full">
       <div className="flex-1 overflow-y-auto space-y-2 text-black border-b p-2 bg-gray-50">
         {messages.map((msg, idx) => (
-          <div key={idx} className="text-sm whitespace-pre-wrap">
+          <div
+            key={idx}
+            dir={lang === 'ar' ? 'rtl' : 'ltr'}
+            className={`text-sm whitespace-pre-wrap ${lang === 'ar' ? 'text-right' : 'text-left'}`}
+          >
             {msg.sender === 'user' ? `🧑‍💼: ${msg.text}` : `🤖: ${msg.text}`}
           </div>
         ))}
@@ -131,8 +135,12 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => 
           value={input}
           onChange={(e) => setInput(e.target.value)}
           className="w-full border px-4 py-2 rounded text-black resize-none"
-          placeholder={t.inputPlaceholder}
+          placeholder={
+            t.inputPlaceholder ||
+            (lang === 'ar' ? 'تحدث أو اكتب هنا' : lang === 'fr' ? 'Parlez ou tapez ici' : 'Speak or type here')
+          }
           rows={2}
+          dir={lang === 'ar' ? 'rtl' : 'ltr'}
         />
         <div className="flex flex-wrap justify-between items-center gap-2 mt-2">
           {isVoiceAllowed(userPlan) && (
@@ -148,7 +156,7 @@ const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => 
             onClick={handleSend}
             className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
           >
-            {t.send}
+            {t.send || (lang === 'ar' ? 'إرسال' : lang === 'fr' ? 'Envoyer' : 'Send')}
           </button>
           {isVoiceAllowed(userPlan) && (
             <ToggleVoice enabled={voiceEnabled} onToggle={setVoiceEnabled} />
