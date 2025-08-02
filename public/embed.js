@@ -1,7 +1,12 @@
 (function () {
-  const userId = document.currentScript.dataset.userId;
+  const scriptTag = document.currentScript;
+  const userId = scriptTag?.dataset?.userId;
+  const lang = scriptTag?.dataset?.lang || 'en';
+  const agentId = scriptTag?.dataset?.agentId;
+
   if (!userId) return;
 
+  // Widget container
   const container = document.createElement('div');
   container.style = `
     position: fixed;
@@ -10,32 +15,24 @@
     z-index: 9999;
   `;
 
-  // Create iframe (chat window)
-  const iframe = document.createElement('iframe')
-
-
-  iframe.src = `https://serine.vercel.app/embed?uid=${userId}`;
-  iframe.allow = 'microphone' // ✅ this line allows voice inside iframe!					   
+  // Chat iframe — ✅ FIXED: Added agentId to URL
+  const iframe = document.createElement('iframe');
+  iframe.src = `http://localhost:3000/embed?uid=${userId}&lang=${lang}&aid=${agentId}`;
+  iframe.allow = 'microphone; clipboard-write;';
   iframe.style = `
-				  
-			   
-			  
     width: 320px;
     height: 450px;
-				  
     border: none;
-				
     border-radius: 16px;
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
     display: block;
   `;
 
-  // Create toggle button (🤖)
+  // Floating icon
   const toggleBtn = document.createElement('button');
   toggleBtn.textContent = '🤖';
   toggleBtn.title = 'Open chatbot';
   toggleBtn.style = `
-    display: none;
     width: 56px;
     height: 56px;
     font-size: 24px;
@@ -49,23 +46,38 @@
     bottom: 0;
     right: 0;
     z-index: 10000;
+    display: none;
   `;
 
-  // Listen for messages from inside the iframe
+  let isOpen = true;
+
+  function closeWidget() {
+    iframe.style.display = 'none';
+    toggleBtn.style.display = 'block';
+    isOpen = false;
+  }
+
+  function openWidget() {
+    iframe.style.display = 'block';
+    toggleBtn.style.display = 'none';
+    isOpen = true;
+  }
+
+  openWidget();
+
+  // Message handlers
   window.addEventListener('message', (event) => {
     if (event.data === 'serine:close') {
-      iframe.style.display = 'none';
-      toggleBtn.style.display = 'block';
+      closeWidget();
     } else if (event.data === 'serine:open') {
-      iframe.style.display = 'block';
-      toggleBtn.style.display = 'none';
+      openWidget();
     }
   });
 
-  // When user clicks 🤖, show iframe
-  toggleBtn.onclick = () => {
+  toggleBtn.addEventListener('click', () => {
+    openWidget();
     window.postMessage('serine:open', '*');
-  };
+  });
 
   container.appendChild(iframe);
   container.appendChild(toggleBtn);

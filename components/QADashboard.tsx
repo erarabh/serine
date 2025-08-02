@@ -1,113 +1,119 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'
+import { useLanguage } from '@/lib/LanguageContext'
+import { ui } from '@/lib/i18n'
+import { useAgent } from '@/lib/AgentContext'
 
-interface QAPair {
-  id: string;
-  question: string;
-  answer: string;
-}
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+type QAItem = { id: string; question: string; answer: string }
 
 export default function QADashboard({ userId }: { userId: string }) {
-  const [qaPairs, setQaPairs] = useState<QAPair[]>([]);
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [status, setStatus] = useState('');
+  const { lang } = useLanguage()
+  const t = ui[lang] || ui['en']
+  const { selectedAgent } = useAgent()
+  const [items, setItems] = useState<QAItem[]>([])
+  const [newQ, setNewQ] = useState('')
+  const [newA, setNewA] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  // ✅ Load Q&A on mount or userId change
-  useEffect(() => {
-    if (!userId) return;
-    fetch(`${BACKEND_URL}/qa/${userId}`)
-      .then((res) => res.json())
-      .then((data) => setQaPairs(data.data || []))
-      .catch((err) => {
-        console.error('❌ Error fetching Q&A:', err);
-      });
-	  console.log('📌 QADashboard mounted with userId:', userId)
-  }, [userId]);
-
-  const handleAdd = async () => {
-    if (!question || !answer || !userId) return;
-    setStatus('Adding...');
-
-    const res = await fetch(`${BACKEND_URL}/qa`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, question, answer }),
-    });
-
-    const result = await res.json();
-    console.log('📬 Q&A POST result:', result)
-    if (result.success && result.insertedId) {
-      setQaPairs((prev) => [...prev, { id: result.insertedId, question, answer }]);
-      setQuestion('');
-      setAnswer('');
-      setStatus('✅ Added!');
-    } else {
-      setStatus('❌ Failed to add');
+  const fetchQA = async () => {
+    if (!selectedAgent) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/qa?userId=${userId}&agentId=${selectedAgent.id}`)
+      const json = await res.json()
+      setItems(json.data || [])
+    } catch (e) {
+      console.error('Error fetching Q&A:', e)
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
-  const handleDelete = async (id: string) => {
-    await fetch(`${BACKEND_URL}/qa/${id}`, {
-      method: 'DELETE',
-    });
-    setQaPairs((prev) => prev.filter((q) => q.id !== id));
-  };
+  useEffect(() => {
+    fetchQA()
+  }, [selectedAgent, userId])
+
+  const addQA = async () => {
+    if (!newQ || !newA || !selectedAgent) return
+    setLoading(true)
+    try {
+      await fetch(`/api/qa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, agentId: selectedAgent.id, question: newQ, answer: newA })
+      })
+      setNewQ('')
+      setNewA('')
+      await fetchQA()
+    } catch (e) {
+      console.error('Error adding Q&A:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const deleteQA = async (id: string) => {
+    if (!confirm(t.delete + '?')) return
+    setLoading(true)
+    try {
+      await fetch(`/api/qa/${id}`, { method: 'DELETE' })
+      await fetchQA()
+    } catch (e) {
+      console.error('Error deleting Q&A:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!selectedAgent) return <p>❌ No AI agent selected.</p>
 
   return (
-    <div className="bg-white p-6 rounded shadow-md space-y-4">
-      <h2 className="text-xl font-semibold">✍️ Manual Q&A Manager</h2>
+    <div className="bg-white shadow p-6 rounded border space-y-6">
+      
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input
-          className="w-full border px-3 py-2 rounded"
-          placeholder="Question"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
+          value={newQ}
+          onChange={e => setNewQ(e.target.value)}
+          placeholder={t.newQuestion}
+          className="border px-3 py-2 rounded w-full"
         />
-        <textarea
-          className="w-full border px-3 py-2 rounded"
-          placeholder="Answer"
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
+        <input
+          value={newA}
+          onChange={e => setNewA(e.target.value)}
+          placeholder={t.newAnswer}
+          className="border px-3 py-2 rounded w-full"
         />
-        <button
-          onClick={handleAdd}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
-          ➕ Add Q&A
-        </button>
-        {status && <p className="text-sm text-gray-700">{status}</p>}
       </div>
 
-      <hr />
+      <button
+        disabled={loading || !newQ || !newA}
+        onClick={addQA}
+        className="mt-2 bg-purple-600 text-white px-4 py-2 rounded disabled:opacity-50"
+      >
+        {t.addQA}
+      </button>
 
-      <div className="space-y-2">
-        <h3 className="font-medium">🧠 Stored Pairs</h3>
-        {qaPairs.length === 0 ? (
-          <p className="text-gray-500">No Q&A pairs found.</p>
-        ) : (
-          qaPairs.map((qa) => (
-            <div key={qa.id} className="border p-3 bg-gray-50 rounded">
-              <p>
-                <strong>Q:</strong> {qa.question}
-              </p>
-              <p>
-                <strong>A:</strong> {qa.answer}
-              </p>
+      <div className="space-y-4 mt-6">
+        {loading && <p>{t.loading}</p>}
+        {!loading && items.length === 0 && <p className="text-gray-500">{t.noItems}</p>}
+        {!loading &&
+          items.map(q => (
+            <div key={q.id} className="border p-4 rounded flex justify-between items-center">
+              <div>
+                <p className="font-medium">Q: {q.question}</p>
+                <p className="font-medium">A: {q.answer}</p>
+              </div>
               <button
-                className="text-xs text-red-500 hover:underline"
-                onClick={() => handleDelete(qa.id)}
+                onClick={() => deleteQA(q.id)}
+                className="text-red-600 hover:text-red-800"
               >
-                ❌ Delete
+                {t.delete}
               </button>
             </div>
-          ))
-        )}
+          ))}
       </div>
     </div>
-  );
+  )
 }

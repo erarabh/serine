@@ -1,48 +1,50 @@
-// ✅ File: frontend/components/EmbedChatbot.tsx
 'use client'
 
-import { useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import ChatWidget from './ChatWidget'
+import { Language } from '@/lib/i18n'
+import { AgentProvider } from '@/lib/AgentContext'
 
-export default function EmbedChatbot() {
-  const params = useSearchParams()
-  const userId = params.get('uid') || ''
+interface Props {
+  userId: string
+  agentId: string | null
+  lang: Language
+}
+
+export default function EmbedChatbot({ userId, agentId, lang }: Props) {
   const [open, setOpen] = useState(true)
+
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data === 'serine:open') setOpen(true)
+      if (e.data === 'serine:close') setOpen(false)
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  if (!open) return null
 
   return (
     <div className="fixed bottom-6 right-4 z-[9999]">
-      {open ? (
-        <div className={`transition-transform duration-300 scale-100 hover:scale-100 w-[290px] h-[410px] bg-white rounded-xl shadow-lg border overflow-hidden flex flex-col`}>
-          <div className="flex justify-between items-center px-4 py-2 bg-purple-600 text-white">
-            <span className="font-semibold">💬 Serine AI Assistant</span>
-            <button
-              onClick={() => {
-                setOpen(false)
-                window.parent.postMessage('serine:close', '*')
-              }}
-              className="text-white text-xl hover:text-gray-200 focus:outline-none"
-              title="Close chatbot"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <ChatWidget userId={userId} />
-          </div>
+      <div className="transition-all duration-300 w-[290px] h-[425px] bg-white rounded-xl shadow-lg border overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center px-4 py-2 bg-purple-600 text-white">
+          💬 Serine AI Assistant
+          <button
+            onClick={() => window.parent.postMessage('serine:close', '*')}
+            className="text-white text-xl hover:text-gray-200 focus:outline-none"
+          >
+            ✕
+          </button>
         </div>
-      ) : (
-        <button
-          onClick={() => {
-            setOpen(true)
-            window.parent.postMessage('serine:open', '*')
-          }}
-          className="w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg text-2xl hover:bg-purple-700"
-          title="Open chatbot"
-        >
-          🤖
-        </button>
-      )}
+
+        <div className="flex-1 overflow-hidden">
+          {/* ✅ Use AgentProvider here to provide context */}
+          <AgentProvider userId={userId} initialAgentId={agentId}>
+            <ChatWidget userId={userId} lang={lang} />
+          </AgentProvider>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,21 +1,22 @@
 'use client'
 
-import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useState, useEffect } from 'react'
+import { useSupabaseClient }    from '@supabase/auth-helpers-react'
+import { useSearchParams }      from 'next/navigation'
 
 export default function AuthBox() {
-  const [email, setEmail] = useState('')
+  const supabase = useSupabaseClient()
+  const params   = useSearchParams()
+  const preEmail = params.get('email') || ''
+
+  const [email, setEmail]       = useState(preEmail)
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const [isLogin, setIsLogin] = useState(true)
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError('')
-    setMessage('')
+    setError(''); setLoading(true)
 
     if (!email || !password) {
       setError('Please enter both email and password.')
@@ -23,77 +24,53 @@ export default function AuthBox() {
       return
     }
 
-    if (!isLogin) {
-      const { error } = await supabase.auth.signUp({ email, password })
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
 
-      if (error) {
-        setError(error.message)
-      } else {
-        setMessage('Check your email to confirm your account.')
-      }
-
+    if (signInError || !data?.session) {
+      setError(signInError?.message || 'Invalid credentials')
       setLoading(false)
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-      if (error) {
-        setError(error.message)
-      } else {
-        setMessage('Login successful! Redirecting...')
-        window.location.reload()
-
-      }
-
-      setLoading(false)
+      return
     }
+
+    window.location.href = '/dashboard'
   }
 
   return (
     <div className="bg-white p-6 rounded shadow-md space-y-4 max-w-sm mx-auto">
-      <h2 className="text-lg font-semibold text-center">
-        {isLogin ? '🔐 Log In' : '📝 Sign Up'}
-      </h2>
-
-      <form className="space-y-3" onSubmit={handleSubmit}>
+      <h2 className="text-lg font-semibold text-center">🔐 Log In</h2>
+      <form onSubmit={handleSubmit} className="space-y-3">
         <input
-          className="border p-2 w-full rounded"
+          type="email"
           placeholder="Email"
           value={email}
-          type="email"
           autoComplete="email"
-          onChange={(e) => setEmail(e.target.value)}
+          required
+          onChange={e => setEmail(e.target.value)}
+          className="border p-2 w-full rounded"
         />
         <input
-          className="border p-2 w-full rounded"
           type="password"
           placeholder="Password"
           value={password}
-          autoComplete={isLogin ? 'current-password' : 'new-password'}
-          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          required
+          onChange={e => setPassword(e.target.value)}
+          className="border p-2 w-full rounded"
         />
 
         {error && <p className="text-red-500">{error}</p>}
-        {message && <p className="text-green-500">{message}</p>}
 
         <button
           type="submit"
-          className="bg-purple-600 w-full text-white py-2 rounded hover:bg-purple-700"
           disabled={loading}
+          className="bg-purple-600 w-full text-white py-2 rounded hover:bg-purple-700"
         >
-          {loading ? 'Loading...' : isLogin ? 'Log In' : 'Sign Up'}
+          {loading ? 'Loading...' : 'Log In'}
         </button>
       </form>
-
-      <p
-        className="text-sm text-center text-blue-600 underline cursor-pointer"
-        onClick={() => {
-          setIsLogin(!isLogin)
-          setError('')
-          setMessage('')
-        }}
-      >
-        {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Log In'}
-      </p>
     </div>
   )
 }

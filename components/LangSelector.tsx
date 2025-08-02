@@ -1,25 +1,23 @@
-'use client'
-import { useState } from 'react'
-import { languages, Language } from '@/lib/i18n'
+// components/LangSelector.tsx
+'use client';
+import { useLanguage } from '@/lib/LanguageContext';
+import { languages } from '@/lib/i18n';
 
-const LangSelector = ({ onChange }: { onChange: (lang: Language) => void }) => {
-  const [selected, setSelected] = useState<Language>('en')
-
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const lang = e.target.value as Language
-    setSelected(lang)
-    onChange(lang)
-  }
-
+interface Props { small?: boolean; }
+export default function LangSelector({ small = false }: Props) {
+  const { lang, setLang } = useLanguage();
   return (
-    <select value={selected} onChange={handleChange} className="text-black p-1 rounded border">
-      {languages.map((lang) => (
-        <option key={lang} value={lang}>
-          {lang.toUpperCase()}
-        </option>
+    <select
+      value={lang}
+      onChange={(e) => setLang(e.target.value as any)}
+      className={`text-black px-1 py-1 rounded border ${small ? 'text-xs' : ''}`}
+    >
+      {languages.map(l => (
+        <option key={l} value={l}>{l.toUpperCase()}</option>
       ))}
     </select>
-  )
+  );
 }
 
-export default LangSelector
+
+

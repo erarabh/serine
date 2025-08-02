@@ -1,170 +1,200 @@
-// ✅ frontend/components/ChatWidget.tsx
-'use client'
+'use client';
 
-import { useEffect, useRef, useState } from 'react'
-import { ui, defaultLang, Language } from '@/lib/i18n'
-import ToggleVoice from '@/components/ToggleVoice'
-import { isVoiceAllowed } from '@/utils/planCheck'
+import { useEffect, useRef, useState } from 'react';
+import { useLanguage } from '@/lib/LanguageContext';
+import { ui } from '@/lib/i18n';
+import ToggleVoice from '@/components/ToggleVoice';
+import LangSelector from '@/components/LangSelector';
+import { isVoiceAllowed } from '@/utils/planCheck';
+import { useAgent } from '@/lib/AgentContext';
 
 interface Props {
-  lang?: Language
-  userPlan?: string
-  userId?: string
+  userPlan?: string;
+  userId?: string;
 }
 
-type ChatMessage = { sender: 'user' | 'bot'; text: string }
+type ChatMessage = {
+  sender: 'user' | 'bot';
+  text: string;
+  sessionId?: string;
+};
 
-declare global {
-  interface Window {
-    SpeechRecognition?: typeof window.SpeechRecognition
-    webkitSpeechRecognition?: typeof window.webkitSpeechRecognition
-  }
-}
+export default function ChatWidget({ userPlan = 'pro', userId }: Props) {
+  const { lang } = useLanguage();
+  const { selectedAgent } = useAgent();
+  const t = ui[lang] || ui['en'];
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const recognitionRef = useRef<any>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-const ChatWidget = ({ lang = defaultLang, userPlan = 'pro', userId }: Props) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState('')
-  const [voiceEnabled, setVoiceEnabled] = useState(true)
-  const recognitionRef = useRef<any>(null)
-
-  const t = ui[lang]
-
+  // Load history
   useEffect(() => {
-    const SpeechRecognitionConstructor =
-      window.webkitSpeechRecognition || window.SpeechRecognition
+    if (!userId || !selectedAgent?.id) return;
+    setMessages([]);
+    fetch(`/api/sessions?userId=${userId}&agentId=${selectedAgent.id}`)
+      .then(r => r.json())
+      .then(json => {
+        if (json.data) {
+          setMessages(
+            json.data.map((s: any) => ({
+              sender: s.role === 'user' ? 'user' : 'bot',
+              text:   s.message
+            }))
+          );
+        }
+      })
+      .catch(console.error);
+  }, [userId, selectedAgent]);
 
-    if (SpeechRecognitionConstructor) {
-      const recognition = new SpeechRecognitionConstructor()
-      recognition.lang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US'
-      recognition.interimResults = false
+  // Auto-scroll
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-      recognition.onresult = (event: any) => {
-        const spoken = event.results[0][0].transcript
-        setInput(spoken)
+  // Voice setup
+  useEffect(() => {
+    const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US';
+    rec.interimResults = false;
+    rec.onresult = (e: any) => {
+      const spoken = e.results[0][0].transcript;
+      setInput(spoken);
+      setTimeout(() => sendMessage(spoken), 500);
+    };
+    rec.onend = () => { rec.started = false; };
+    recognitionRef.current = rec;
+  }, [lang, voiceEnabled, selectedAgent, userId]);
 
-        setTimeout(() => {
-          setMessages((prev) => [...prev, { sender: 'user', text: spoken }])
-
-          fetch(`${BACKEND_URL}/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: spoken, userId, lang }),
-          })
-            .then((res) => res.json())
-            .then(({ reply }) => {
-              setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
-              if (voiceEnabled) {
-                const utterance = new SpeechSynthesisUtterance(reply)
-                utterance.lang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US'
-                speechSynthesis.speak(utterance)
-              }
-            })
-            .catch((err) => {
-              console.error('❌ Chat fetch error:', err)
-              setMessages((prev) => [...prev, { sender: 'bot', text: '⚠️ Server error or not connected.' }])
-            })
-        }, 1000)
-      }
-
-      recognition.onend = () => {
-        if (recognitionRef.current) recognitionRef.current.started = false
-      }
-
-      recognitionRef.current = recognition
-    }
-  }, [lang, voiceEnabled])
-
-  const handleSend = async () => {
-    if (!input.trim()) return
-
-    const userMessage = input.trim()
-    setMessages((prev) => [...prev, { sender: 'user', text: userMessage }])
-    setInput('')
-
+  // Send a message
+  const sendMessage = async (msg: string) => {
+    setMessages(prev => [...prev, { sender: 'user', text: msg }]);
     try {
-      const res = await fetch(`${BACKEND_URL}/chat`, {
+      // 1) Call Next.js proxy
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage, userId, lang }),
-      })
+        body: JSON.stringify({
+          userId,
+          agentId: selectedAgent?.id,
+          message: msg
+        })
+      });
+      const { reply, sessionId } = await res.json();
 
-      const { reply } = await res.json()
-      setMessages((prev) => [...prev, { sender: 'bot', text: reply }])
+      // 2) Append the bot reply
+      setMessages(prev => [
+        ...prev,
+        { sender: 'bot', text: reply, sessionId }
+      ]);
 
+      // 3) Optionally speak it
       if (voiceEnabled) {
-        const utterance = new SpeechSynthesisUtterance(reply)
-        utterance.lang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US'
-        speechSynthesis.speak(utterance)
+        const u = new SpeechSynthesisUtterance(reply);
+        u.lang = lang === 'ar' ? 'ar-SA' : lang === 'fr' ? 'fr-FR' : 'en-US';
+        speechSynthesis.speak(u);
       }
-    } catch (err) {
-      console.error('❌ Chat fetch error:', err)
-      setMessages((prev) => [...prev, { sender: 'bot', text: '⚠️ Server error or not connected.' }])
+    } catch {
+      setMessages(prev => [
+        ...prev,
+        { sender: 'bot', text: t.serverError || '⚠️ Server error.' }
+      ]);
     }
-  }
+  };
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    await sendMessage(input.trim());
+    setInput('');
+  };
 
   const startVoice = () => {
-    const recognition = recognitionRef.current
-    if (!recognition || recognition.started) return
-
-    try {
-      recognition.start()
-      recognition.started = true
-    } catch {
-      console.warn('Speech already started or not supported.')
+    const rec = recognitionRef.current;
+    if (rec && !rec.started) {
+      try { rec.start(); rec.started = true }
+      catch { console.warn('Voice start error') }
     }
-  }
+  };
+
+  // Find last bot message with a sessionId
+  const lastBot = [...messages]
+    .reverse()
+    .find(m => m.sender === 'bot' && m.sessionId);
+
+  // Send thumbs feedback
+  const sendFeedback = async (sessionId: string, feedback: 'positive' | 'negative') => {
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          agentId: selectedAgent?.id,
+          sessionId,
+          feedback
+        })
+      });
+    } catch (err) {
+      console.error('Feedback error', err);
+    }
+  };
 
   return (
-    <div className="flex flex-col h-full max-h-full">
-      <div className="flex-1 overflow-y-auto space-y-2 text-black border-b p-2 bg-gray-50">
-        {messages.map((msg, idx) => (
+    <div className="flex flex-col h-full p-2 space-y-2">
+      {/* Chat history */}
+      <div className="flex-1 overflow-y-auto space-y-2 border rounded p-2 bg-gray-50">
+        {messages.map((msg, i) => (
           <div
-            key={idx}
+            key={i}
             dir={lang === 'ar' ? 'rtl' : 'ltr'}
-            className={`text-sm whitespace-pre-wrap ${lang === 'ar' ? 'text-right' : 'text-left'}`}
+            className={`text-sm whitespace-pre-wrap ${
+              msg.sender === 'bot' ? 'text-gray-800' : 'text-black'
+            } ${lang === 'ar' ? 'text-right' : 'text-left'}`}
           >
-            {msg.sender === 'user' ? `🧑‍💼: ${msg.text}` : `🤖: ${msg.text}`}
+            {msg.sender === 'user' ? msg.text : `🤖: ${msg.text}`}
           </div>
         ))}
+        <div ref={bottomRef} />
       </div>
 
-      <div className="p-2 border-t bg-white">
+      {/* Input + controls */}
+      <div className="border-t pt-2 bg-white">
         <textarea
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          className="w-full border px-4 py-2 rounded text-black resize-none"
-          placeholder={
-            t.inputPlaceholder ||
-            (lang === 'ar' ? 'تحدث أو اكتب هنا' : lang === 'fr' ? 'Parlez ou tapez ici' : 'Speak or type here')
-          }
+          onChange={e => setInput(e.target.value)}
           rows={2}
+          placeholder={t.inputPlaceholder || 'Type a message'}
+          className="w-full border px-3 py-2 rounded resize-none text-black"
           dir={lang === 'ar' ? 'rtl' : 'ltr'}
         />
-        <div className="flex flex-wrap justify-between items-center gap-2 mt-2">
+
+        <div className="flex items-center gap-2 mt-2">
           {isVoiceAllowed(userPlan) && (
             <button
-              className="px-3 py-2 bg-gray-100 text-purple-600 rounded hover:bg-gray-200"
               onClick={startVoice}
-              title="Click to speak"
-            >
-              🎤
-            </button>
+              className="px-3 py-2 bg-gray-100 text-purple-600 rounded hover:bg-gray-200"
+            >🎤</button>
+          )}
+          {isVoiceAllowed(userPlan) && (
+            <ToggleVoice enabled={voiceEnabled} onToggle={setVoiceEnabled} />
+          )}
+          {lastBot?.sessionId && (
+            <div className="flex flex-col items-center space-y-1 mx-1">
+              <button onClick={() => sendFeedback(lastBot.sessionId!, 'positive')} className="hover:text-green-600">👍</button>
+              <button onClick={() => sendFeedback(lastBot.sessionId!, 'negative')} className="hover:text-red-600">👎</button>
+            </div>
           )}
           <button
             onClick={handleSend}
             className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-          >
-            {t.send || (lang === 'ar' ? 'إرسال' : lang === 'fr' ? 'Envoyer' : 'Send')}
-          </button>
-          {isVoiceAllowed(userPlan) && (
-            <ToggleVoice enabled={voiceEnabled} onToggle={setVoiceEnabled} />
-          )}
+          >{t.send || 'Send'}</button>
+          <LangSelector small />
         </div>
       </div>
     </div>
-  )
+  );
 }
-
-export default ChatWidget
