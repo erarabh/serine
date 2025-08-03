@@ -9,17 +9,24 @@ export default function SupabaseClientWrapper({
 }: {
   children: ReactNode
 }) {
-  // Instantiate a browser‐only Supabase client here
   const [supabaseClient] = useState(() =>
     createPagesBrowserClient({
-      // preserve your cookie options
       cookieOptions: {
-        name: `sb-${process.env.NEXT_PUBLIC_SUPABASE_URL
-          ?.split('https://')[1]
-          ?.split('.')[0]}-auth-token`,
-        lifetime: 60 * 60 * 24 * 7,
+        // 1. Name your cookie using your project ref
+        name: `sb-${
+          process.env.NEXT_PUBLIC_SUPABASE_URL!
+            .replace('https://', '')
+            .split('.')[0]
+        }-auth-token`,
+
+        // 2. Domain comes from .env.local
+        domain: process.env.NEXT_PUBLIC_COOKIE_DOMAIN!,
+
         path: '/',
         sameSite: 'lax',
+
+        // 3. Only secure in production
+        secure: process.env.NODE_ENV === 'production',
       },
     })
   )

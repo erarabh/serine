@@ -83,10 +83,29 @@ export async function trainWebsite(
     agent_id:   agentId
   }
 
+  // <--- FIXED: use userId/agentId as values for user_id and agent_id
   const detailQAs: QAItem[] = products.flatMap(p => [
-    { question: `What is ${p.name}?`,          answer: p.desc, source_url: url, user_id, agent_id },
-    { question: `What is the price of ${p.name}?`, answer: p.price, source_url: url, user_id, agent_id },
-    { question: `How do I purchase ${p.name}?`,   answer: `Click “${p.cta}”`, source_url: url, user_id, agent_id }
+    {
+      question:   `What is ${p.name}?`,
+      answer:     p.desc,
+      source_url: url,
+      user_id:    userId,
+      agent_id:   agentId
+    },
+    {
+      question:   `What is the price of ${p.name}?`,
+      answer:     p.price,
+      source_url: url,
+      user_id:    userId,
+      agent_id:   agentId
+    },
+    {
+      question:   `How do I purchase ${p.name}?`,
+      answer:     `Click “${p.cta}”`,
+      source_url: url,
+      user_id:    userId,
+      agent_id:   agentId
+    }
   ])
 
   const allQA = [...siteQA, listQA, ...detailQAs]
@@ -101,9 +120,15 @@ export async function trainWebsite(
 
   const { data, error } = await supabaseAdmin
     .from('qa_pairs')
-    .insert(allQA.map(({ question, answer, source_url, user_id, agent_id }) => ({
-      question, answer, source_url, user_id, agent_id
-    })))
+    .insert(
+      allQA.map(({ question, answer, source_url, user_id, agent_id }) => ({
+        question,
+        answer,
+        source_url,
+        user_id,
+        agent_id
+      }))
+    )
     .select()   // get the inserted rows back
 
   if (error) throw error

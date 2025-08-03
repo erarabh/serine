@@ -1,10 +1,9 @@
-// frontend/app/api/usage/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient }         from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!   // or anon key, if you don’t use RLS
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use anon if RLS is disabled
 )
 
 export async function GET(req: NextRequest) {
@@ -27,12 +26,12 @@ export async function GET(req: NextRequest) {
     .eq('user_id', userId)
 
   // 3) Sum messages from chat_metrics *this month only*
-  const now         = new Date()
-  const monthStart  = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthStartStr = monthStart.toISOString().slice(0, 10) // "2025-07-01"
-  const todayStr      = now.toISOString().slice(0, 10)        // "2025-07-12"
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthStartStr = monthStart.toISOString().slice(0, 10)
+  const todayStr = now.toISOString().slice(0, 10)
 
-  const { data: metricsData = [], error: e3 } = await supabase
+  const { data: metricsData, error: e3 } = await supabase
     .from('chat_metrics')
     .select('total_messages')
     .eq('user_id', userId)
@@ -44,14 +43,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Usage fetch failed' }, { status: 500 })
   }
 
-  const apiCalls = metricsData.reduce(
-    (sum, row) => sum + (row.total_messages ?? 0),
-    0
-  )
+  const apiCalls = Array.isArray(metricsData)
+    ? metricsData.reduce((sum, row) => sum + (row.total_messages ?? 0), 0)
+    : 0
 
   return NextResponse.json({
     agent_count: agentCount,
-    qa_pairs:    qaPairs,
-    api_calls:   apiCalls,
+    qa_pairs: qaPairs,
+    api_calls: apiCalls,
   })
 }

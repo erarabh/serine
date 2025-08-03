@@ -1,15 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { initHeroScene } from '@/lib/heroScene'
 import './styles/homepage.css'
 
 export default function HomePage() {
-  const [billing, setBilling] = useState<'monthly'|'yearly'>('monthly')
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
-							 
-    initHeroScene()
+    // Initialize Three.js hero scene on our canvas
+    if (canvasRef.current) {
+      initHeroScene(canvasRef.current)
+    }
 
  
     // Navbar scroll effect
@@ -17,10 +20,10 @@ export default function HomePage() {
       const navbar = document.getElementById('navbar')
       if (navbar) {
         navbar.classList.toggle('scrolled', window.scrollY > 100)
-										  
-				
-											 
-		 
+   
+ 
+   
+   
       }
     }
 
@@ -36,10 +39,10 @@ export default function HomePage() {
       const targetEl = document.querySelector(href)
       if (targetEl) {
         targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
-							   
-						  
-			
-		 
+	
+  
+   
+   
       }
     }
 
@@ -48,10 +51,10 @@ export default function HomePage() {
     )
 
     // Scroll animations
-							 
-					 
+  
+   
     const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
-	 
+  
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
@@ -69,8 +72,8 @@ export default function HomePage() {
     const handleParallaxScroll = () => {
       const scrolled = window.pageYOffset
       const parallax = document.querySelector<HTMLElement>('.hero')
-								  
-	  
+	
+   
       if (parallax) {
         parallax.style.transform = `translateY(${scrolled * 0.5}px)`
       }
@@ -80,45 +83,49 @@ export default function HomePage() {
 
     // Interactive demo button
     const demoVideo = document.querySelector<HTMLElement>('.demo-video')
-					
+  
     const handleDemoClick = () => {
       if (!demoVideo) return
       demoVideo.innerHTML = '🎬 Loading Demo...'
       demoVideo.style.background = 'linear-gradient(135deg, #45b7d1, #96ceb4)'
-		
+  
       setTimeout(() => {
         demoVideo.innerHTML = '✨ Demo Ready! Click to Start'
         demoVideo.style.background = 'linear-gradient(135deg, #ff6b6b, #4ecdc4)'
       }, 2000)
-	   
-	  
-														  
+ 
+   
+	
     }
     demoVideo?.addEventListener('click', handleDemoClick)
 
     // Floating particles background
     const createFloatingParticles = () => {
-      const particleContainer = document.createElement('div')
-      particleContainer.style.position = 'fixed'
-      particleContainer.style.top = '0'
-      particleContainer.style.left = '0'
-      particleContainer.style.width = '100%'
-      particleContainer.style.height = '100%'
-      particleContainer.style.pointerEvents = 'none'
-      particleContainer.style.zIndex = '1'
-      document.body.appendChild(particleContainer)
+      const container = document.createElement('div')
+      Object.assign(container.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: '1',
+      })
+      document.body.appendChild(container)
 
       for (let i = 0; i < 50; i++) {
-        const particle = document.createElement('div')
-        particle.style.position = 'absolute'
-        particle.style.width = '2px'
-        particle.style.height = '2px'
-        particle.style.background = `rgba(78, 205, 196, ${Math.random() * 0.5 + 0.2})`
-        particle.style.borderRadius = '50%'
-        particle.style.left = `${Math.random() * 100}%`
-        particle.style.top = `${Math.random() * 100}%`
-        particle.style.animation = `float ${Math.random() * 10 + 10}s infinite linear`
-        particleContainer.appendChild(particle)
+        const p = document.createElement('div')
+        Object.assign(p.style, {
+          position: 'absolute',
+          width: '2px',
+          height: '2px',
+          background: `rgba(78,205,196,${Math.random() * 0.5 + 0.2})`,
+          borderRadius: '50%',
+          left: `${Math.random() * 100}%`,
+          top: `${Math.random() * 100}%`,
+          animation: `float ${Math.random() * 10 + 10}s infinite linear`,
+        })
+        container.appendChild(p)
       }
     }
 
@@ -126,42 +133,44 @@ export default function HomePage() {
 
     // Enhanced button interactions
     const buttons = document.querySelectorAll<HTMLElement>('.btn, .cta-button')
-							   
+	
     const handleMouseEnter = (e: Event) => {
-      const target = e.currentTarget as HTMLElement
-      target.style.transform = 'translateY(-3px) scale(1.05)'
+      const t = e.currentTarget as HTMLElement
+      t.style.transform = 'translateY(-3px) scale(1.05)'
     }
-	  
+   
     const handleMouseLeave = (e: Event) => {
-      const target = e.currentTarget as HTMLElement
-      target.style.transform = 'translateY(0) scale(1)'
+      const t = e.currentTarget as HTMLElement
+      t.style.transform = 'translateY(0) scale(1)'
     }
-	  
+   
     const handleButtonClick = (e: MouseEvent) => {
-      const target = e.currentTarget as HTMLElement
-							   
+      const t = e.currentTarget as HTMLElement
+	
       const ripple = document.createElement('span')
-      const rect = target.getBoundingClientRect()
+      const rect = t.getBoundingClientRect()
       const size = Math.max(rect.width, rect.height)
       const x = e.clientX - rect.left - size / 2
       const y = e.clientY - rect.top - size / 2
 
-      ripple.style.width = ripple.style.height = `${size}px`
-      ripple.style.left = `${x}px`
-      ripple.style.top = `${y}px`
-      ripple.style.position = 'absolute'
-      ripple.style.borderRadius = '50%'
-      ripple.style.background = 'rgba(255, 255, 255, 0.3)'
-      ripple.style.transform = 'scale(0)'
-      ripple.style.animation = 'ripple 0.6s linear'
-      ripple.style.pointerEvents = 'none'
-
-      target.style.position = 'relative'
-      target.appendChild(ripple)
-		
+      Object.assign(ripple.style, {
+        width: `${size}px`,
+        height: `${size}px`,
+        left: `${x}px`,
+        top: `${y}px`,
+        position: 'absolute',
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.3)',
+        transform: 'scale(0)',
+        animation: 'ripple 0.6s linear',
+        pointerEvents: 'none',
+      })
+      t.style.position = 'relative'
+      t.appendChild(ripple)
+  
       setTimeout(() => ripple.remove(), 600)
-						 
-			   
+	
+   
     }
     buttons.forEach(btn => {
       btn.addEventListener('mouseenter', handleMouseEnter)
@@ -169,7 +178,7 @@ export default function HomePage() {
       btn.addEventListener('click', handleButtonClick as any)
     })
 
-    // Cleanup
+    // Cleanup on unmount
     return () => {
       window.removeEventListener('scroll', handleScroll)
       window.removeEventListener('scroll', handleParallaxScroll)
@@ -210,13 +219,27 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section id="home" className="section">
+        {/* Three.js Canvas */}
+        <canvas
+          ref={canvasRef}
+          className="hero-canvas"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100vh',
+            zIndex: -1,
+          }}
+        />
+
         <div className="hero">
           <div className="hero-content">
             <h1 className="hero-title">Transform Your Business with Intelligent AI Agents</h1>
             <p className="hero-subtitle">
               Unleash the power of autonomous AI agents that work 24/7 to automate your workflows,
-              boost productivity, and accelerate growth. Join thousands already revolutionizing
-              their operations with Serine.
+              boost productivity, and accelerate growth.
+			 
             </p>
             <button className="cta-button">Start Your AI Revolution →</button>
           </div>
@@ -227,7 +250,7 @@ export default function HomePage() {
               style={{
                 width: '100%',
                 borderRadius: '20px',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
               }}
             />
           </div>

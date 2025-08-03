@@ -25,23 +25,29 @@ export default function ChatSentiments({ userId }: { userId: string }) {
   const [range, setRange] = useState<'7d' | '30d' | 'all'>('7d');
 
   useEffect(() => {
-    if (!selectedAgent) return;
-    async function load() {
-      const res = await fetch(`/api/sentiments?userId=${userId}&agentId=${selectedAgent.id}&range=${range}`);
-      const json = await res.json();
-      const entries = json.data || [];
+  const agentId = selectedAgent?.id;
+  if (!agentId) return;
 
-      setList(entries);
-      setChartData(
-        entries.map((s: SentimentEntry) => ({
-          time: new Date(s.created_at).toLocaleDateString(), // 👈 clean axis labels
-          score: s.sentiment_score,
-          key: s.created_at,
-        })).reverse()
-      );
-    }
-    load();
-  }, [selectedAgent, userId, range]);
+  async function load() {
+    const res = await fetch(
+      `/api/sentiments?userId=${userId}&agentId=${agentId}&range=${range}`
+    );
+    const json = await res.json();
+    const entries = json.data || [];
+
+    setList(entries);
+    setChartData(
+      entries.map((s: SentimentEntry) => ({
+        time: new Date(s.created_at).toLocaleDateString(),
+        score: s.sentiment_score,
+        key: s.created_at,
+      })).reverse()
+    );
+  }
+
+  load();
+}, [selectedAgent, userId, range]);
+
 
   if (!selectedAgent) return <p>❌ {t.serverError}</p>;
   if (!list.length) return <p className="text-gray-500">{t.noSentiments}</p>;

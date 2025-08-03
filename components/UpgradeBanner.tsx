@@ -1,49 +1,59 @@
-							   
+// components/UpgradeBanner.tsx
 'use client'
 
+import Link from 'next/link'
+
+export type Plan = 'trial' | 'starter' | 'professional'
+export type UpgradeType = 'agents' | 'qa' | 'api'
+
 interface Props {
-  type: 'agents' | 'qa' | 'api'
+  type: UpgradeType
   usage: number
   limit: number
-  plan: 'trial' | 'starter' | 'professional'
+  plan: Plan
 }
 
-export default function UpgradeBanner({ type, usage, limit, variantId }: Props) {
+const VARIANT_MAP: Record<Plan, Record<UpgradeType, string>> = {
+  trial: {
+    agents: 'LS_TRIAL_AGENTS_VARIANT_ID',
+    qa:     'LS_TRIAL_QA_VARIANT_ID',
+    api:    'LS_TRIAL_API_VARIANT_ID',
+  },
+  starter: {
+    agents: 'LS_STARTER_AGENTS_VARIANT_ID',
+    qa:     'LS_STARTER_QA_VARIANT_ID',
+    api:    'LS_STARTER_API_VARIANT_ID',
+  },
+  professional: {
+    agents: 'LS_PRO_AGENTS_VARIANT_ID',
+    qa:     'LS_PRO_QA_VARIANT_ID',
+    api:    'LS_PRO_API_VARIANT_ID',
+  },
+}
+
+export default function UpgradeBanner({
+  type,
+  usage,
+  limit,
+  plan
+}: Props) {
   const percentage = Math.round((usage / limit) * 100)
   const overLimit = usage >= limit
+  const variantId = VARIANT_MAP[plan][type]
 
-  const typeLabel = {
-    agents: 'AI Agents',
-    qa: 'Q&A Pairs',
-    api: 'API Calls',
-  }[type]
-
-  const upgradeLink =
-    variantId === 'starter'
-      ? 'http://localhost:3000/dashboard?upgrade=professional'
-      : 'http://localhost:3000/dashboard?add=agent'
-
-  const actionLabel = variantId === 'starter'
-    ? 'Upgrade to Professional'
-    : 'Add Agent'
-
-  const message = overLimit
-    ? `${typeLabel} limit exceeded. ${variantId === 'starter' ? 'Upgrade to Professional' : 'Add another agent to continue.'}`
-    : `${typeLabel} usage is at ${percentage}%. Consider ${variantId === 'starter' ? 'upgrading' : 'expanding'} to avoid hitting the limit.`
+  if (!overLimit) return null
 
   return (
-    <div className="p-4 mb-4 rounded border bg-yellow-50 border-yellow-300 text-yellow-900">
-				
-      <p><strong>{message}</strong></p>
-																																									 
-	   
-      <a
-        href={upgradeLink}
-					   
-        className="inline-block mt-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+    <div className="p-4 bg-yellow-100 border border-yellow-300 rounded space-y-2">
+      <p>
+        You’ve hit your {type} limit ({usage}/{limit}).
+      </p>
+      <Link
+        href={`https://app.lemonsqueezy.com/checkout?variant=${variantId}`}
+        className="inline-block bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
       >
-        {actionLabel}
-      </a>
+        Upgrade Plan
+      </Link>
     </div>
   )
 }

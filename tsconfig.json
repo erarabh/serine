@@ -26,9 +26,13 @@
   "include": ["types", "app", "components", "lib", "utils",
     "next-env.d.ts",
     "types/globals.d.ts",
+	"types/**/*.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+	"app/**/*",
+    "components/**/*",
+    "lib/**/*"
   ],
   "exclude": ["node_modules"]
 }

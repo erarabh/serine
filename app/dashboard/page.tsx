@@ -1,5 +1,3 @@
-// frontend/app/dashboard/page.tsx
-
 import { cookies } from 'next/headers'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import AuthBox from '@/components/AuthBox'
@@ -9,24 +7,24 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
-  // 1) Await the cookies store so Next knows we’ve handled the dynamic API
-  const cookieStore = await cookies()
+  // 1) Get cookie store so Supabase SSR can read the session
+  const cookieStore = cookies()
 
-  // 2) Pass a zero-arg function to Supabase pointing at our awaited store
+  // 2) Instantiate Supabase server client
   const supabase = createServerComponentClient({
-    cookies: () => cookieStore
+    cookies: () => cookieStore,
   })
 
-  // 3) Fetch current user
+  // 3) Fetch the currently logged-in user
   const {
-    data: { user }
+    data: { user },
   } = await supabase.auth.getUser()
 
-  // 4) If not logged in, render the AuthBox
+  // 4) If not authenticated, show the sign-in box
   if (!user) {
     return <AuthBox />
   }
 
-  // 5) Otherwise render the Dashboard
+  // 5) Otherwise render the client bundle, passing userId
   return <DashboardClient userId={user.id} />
 }

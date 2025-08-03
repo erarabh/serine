@@ -2,48 +2,40 @@
 
 import { useEffect, useState } from 'react'
 import AgentSelector from '@/components/AgentSelector'
-import LangSelector   from '@/components/LangSelector'
-import ChatbotSetup   from '@/components/ChatbotSetup'
-import QADashboard    from '@/components/QADashboard'
+import LangSelector from '@/components/LangSelector'
+import ChatbotSetup from '@/components/ChatbotSetup'
+import QADashboard from '@/components/QADashboard'
 import ChatSentiments from '@/components/ChatSentiments'
-import AnalyticsPanel from '@/components/AnalyticsPanel'
 import SubscriptionPanel from '@/components/SubscriptionPanel'
-import SupportPanel   from '@/components/SupportPanel'
-import AgentSettings  from '@/components/AgentSettings'
+import SupportPanel from '@/components/SupportPanel'
+import AgentSettings from '@/components/AgentSettings'
+import AnalyticsPage from '@/app/dashboard/analytics/page' // ✅ replaced AnalyticsPanel
 import { AgentProvider } from '@/lib/AgentContext'
-import { useLanguage }  from '@/lib/LanguageContext'
-import { ui }           from '@/lib/i18n'
+import { useLanguage } from '@/lib/LanguageContext'
+import { ui } from '@/lib/i18n'
 
 type Section = 'chatbot' | 'faq' | 'sentiment' | 'analytics' | 'subscription' | 'support'
 
-// **ONLY** these three values allowed downstream
 type PlanKey = 'trial' | 'starter' | 'professional'
-type Period  = 'monthly' | 'yearly'
+type Period = 'monthly' | 'yearly'
 
 export default function DashboardClient({ userId }: { userId: string }) {
-  const [active, setActive]    = useState<Section>('chatbot')
-  const [plan, setPlan]        = useState<PlanKey>('trial')
+  const [active, setActive] = useState<Section>('chatbot')
+  const [plan, setPlan] = useState<PlanKey>('trial')
   const [planPeriod, setPlanPeriod] = useState<Period>('monthly')
   const { lang } = useLanguage()
-  const t        = ui[lang] || ui.en
+  const t = ui[lang] || ui.en
 
   useEffect(() => {
     if (!userId) return
-
     fetch(`/api/users/${userId}`)
       .then(r => r.json())
       .then(data => {
-        // Normalize whatever your DB returns into one of our three keys
         let raw = (data.plan || '').toLowerCase()
         let normalized: PlanKey = 'trial'
-        if (raw === 'starter' || raw === 'growth') {
-          normalized = 'starter'
-        } else if (raw === 'pro' || raw === 'professional') {
-          normalized = 'professional'
-        }
+        if (raw === 'starter' || raw === 'growth') normalized = 'starter'
+        else if (raw === 'professional' || raw === 'pro') normalized = 'professional'
         setPlan(normalized)
-
-        // plan_period comes straight through if valid, else default
         const rp = data.plan_period === 'yearly' ? 'yearly' : 'monthly'
         setPlanPeriod(rp)
       })
@@ -59,11 +51,11 @@ export default function DashboardClient({ userId }: { userId: string }) {
         {/* Sidebar */}
         <nav className="w-64 bg-[rgb(44,62,80)] text-white p-6">
           <h2 className="text-2xl font-bold mb-6">{t.dashboard} Menu</h2>
-          <AgentSelector userId={userId} onSelect={() => {}} />
+          <AgentSelector userId={userId} />
 
           <div className="mt-6 space-y-2">
             <p className="text-sm text-gray-300 uppercase tracking-wide">Agent Tools</p>
-            {(['chatbot','faq','sentiment','analytics'] as Section[]).map(key => (
+            {(['chatbot', 'faq', 'sentiment', 'analytics'] as Section[]).map(key => (
               <button
                 key={key}
                 onClick={() => setActive(key)}
@@ -71,14 +63,14 @@ export default function DashboardClient({ userId }: { userId: string }) {
                   active === key ? 'bg-purple-700' : 'hover:bg-purple-600'
                 }`}
               >
-                {t.nav[key as keyof typeof t.nav]}
+                {t.nav[key]}
               </button>
             ))}
           </div>
 
           <div className="mt-6 space-y-2">
             <p className="text-sm text-gray-300 uppercase tracking-wide">System</p>
-            {(['subscription','support'] as Section[]).map(key => (
+            {(['subscription', 'support'] as Section[]).map(key => (
               <button
                 key={key}
                 onClick={() => setActive(key)}
@@ -86,12 +78,14 @@ export default function DashboardClient({ userId }: { userId: string }) {
                   active === key ? 'bg-purple-700' : 'hover:bg-purple-600'
                 }`}
               >
-                {t.nav[key as keyof typeof t.nav]}
+                {t.nav[key]}
               </button>
             ))}
           </div>
 
-          <div className="mt-8"><LangSelector /></div>
+          <div className="mt-8">
+            <LangSelector />
+          </div>
         </nav>
 
         {/* Main Content */}
@@ -117,8 +111,7 @@ export default function DashboardClient({ userId }: { userId: string }) {
           )}
           {active === 'analytics' && (
             <section>
-              <h1 className="text-2xl font-bold mb-4">📊 {t.nav.analytics}</h1>
-              <AnalyticsPanel userId={userId} plan={plan} />
+              <AnalyticsPage /> {/* ✅ no need to pass plan/userId */}
             </section>
           )}
           {active === 'subscription' && (

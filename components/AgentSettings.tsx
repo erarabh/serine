@@ -1,4 +1,5 @@
 'use client'
+
 import { useState, useEffect } from 'react'
 import { useAgent } from '@/lib/AgentContext'
 
@@ -9,17 +10,19 @@ export default function AgentSettings() {
   const [hotline, setHotline] = useState('')
 
   useEffect(() => {
-    if (selectedAgent) {
-      setHotline(selectedAgent.support_hotline || '')
+    if (selectedAgent?.support_hotline) {
+      setHotline(selectedAgent.support_hotline)
+    } else {
+      setHotline('')
     }
   }, [selectedAgent])
 
-  if (!selectedAgent) return null
+  const saveHotline = async () => {
+    if (!selectedAgent) return // ✅ null guard
 
-  async function saveHotline() {
     try {
       const res = await fetch(
-        `${BACKEND_URL}/api/agents/${selectedAgent.id}`, 
+        `${BACKEND_URL}/api/agents/${selectedAgent.id}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -30,10 +33,12 @@ export default function AgentSettings() {
       const { agent } = await res.json()
       setSelectedAgent(agent)
     } catch (err) {
-      console.error('Failed to save hotline', err)
+      console.error('Failed to save hotline:', err)
       alert('Could not save hotline. See console for details.')
     }
   }
+
+  if (!selectedAgent) return null // ✅ Don't render if no agent selected
 
   return (
     <div className="p-4 bg-white rounded shadow space-y-2">
