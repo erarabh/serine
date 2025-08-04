@@ -3,10 +3,20 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 
-export const runtime = 'nodejs'
+export const config = {
+  api: {
+    bodyParser: false, // ⛔ Disable auto-parsing to preserve raw body
+  }
+}
 
-function verifySignature(rawBody: string, signature: string, secret: string) {
-  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+export const runtime = 'nodejs' // ✅ Full Node.js runtime required for crypto
+
+function verifySignature(rawBody: string, signature: string, secret: string): boolean {
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('hex')
+
   return (
     signature.length === expected.length &&
     crypto.timingSafeEqual(
@@ -18,12 +28,13 @@ function verifySignature(rawBody: string, signature: string, secret: string) {
 
 export async function POST(request: Request) {
   const signature = request.headers.get('x-hook-signature')
-  const rawBody   = await request.text()
+  const rawBody = await request.text()
 
   if (!signature) {
     console.error('[webhook] Missing signature header')
     return NextResponse.json({ error: 'Missing signature' }, { status: 401 })
   }
+
   if (!verifySignature(rawBody, signature, process.env.LEMONSQUEEZY_WEBHOOK_SECRET!)) {
     console.error('[webhook] Invalid signature')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
@@ -37,94 +48,68 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Malformed JSON' }, { status: 400 })
   }
 
-  const eventName =
-    payload.event ||
-    payload.meta?.event_name ||
-    payload.meta?.eventName
+  const eventName = payload.event || payload.meta?.event_name || payload.meta?.eventName
+  const customData = payload.meta?.custom_data || payload.data?.attributes?.custom_data || {}
 
-  const customData =
-    payload.meta?.custom_data ||
-    payload.data?.attributes?.custom_data ||
-    {}
-
-  const userId    = customData.user_id
-  const userEmail =
-    customData.email ||
-    payload.data?.attributes?.user_email
+  const userId = customData.user_id
+  const userEmail = customData.email || payload.data?.attributes?.user_email
 
   if (!userId || !userEmail) {
-    console.error('[webhook] Missing user_id or email in payload')
-    return NextResponse.json(
-      { error: 'Missing custom_data.user_id or user_email' },
-      { status: 400 }
-    )
+    console.error('[webhook] Missing user_id or user_email')
+    return NextResponse.json({ error: 'Missing user ID or email' }, { status: 400 })
   }
 
-  // Only handle these events
-  if (
-    eventName !== 'subscription_created' &&
-    eventName !== 'subscription_payment_success'
-  ) {
-    console.log('[webhook] Ignoring event:', eventName)
-    return NextResponse.json({ ignored: true }, { status: 200 })
+  const variantId = payload.data?.attributes?.variant_id as number
+  const planMap: Record<number, { plan: string; period: string }> = {
+    899349: { plan: 'starter',      period: 'monthly' },
+    899351: { plan: 'starter',      period: 'yearly' },
+    899352: { plan: 'professional', period: 'monthly' },
+    899353: { plan: 'professional', period: 'yearly' },
   }
 
-  // Lazy-load Supabase admin client
+  const mapping = planMap[variantId]
+  if (!mapping) {
+    console.error('[webhook] Unknown variant_id:', variantId)
+    return NextResponse.json({ error: 'Unknown variant' }, { status: 400 })
+  }
+
+  // Lazy load Supabase admin client
   const { createClient } = await import('@supabase/supabase-js')
-  const supabaseAdmin = createClient(
+  const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Map variant → plan/period
-  const variantId = payload.data.attributes.variant_id as number
-  const planMap: Record<number, { plan: string; period: string }> = {
-    899349: { plan: 'starter',      period: 'monthly' },
-    899351: { plan: 'starter',      period: 'yearly'  },
-    899352: { plan: 'professional', period: 'monthly' },
-    899353: { plan: 'professional', period: 'yearly'  }
-  }
-  const mapping = planMap[variantId]
-  if (!mapping) {
-    console.error('[webhook] Unknown variant_id:', variantId)
-    return NextResponse.json({ error: 'Unknown variant_id' }, { status: 400 })
-  }
-
-  // Ensure Auth user exists (create if missing)
-  const { data: lookupUser, error: lookupErr } =
-    await supabaseAdmin.auth.admin.getUserById(userId)
-
-  if (lookupErr && lookupErr.message.includes('User not found')) {
+  // Ensure user exists or create
+  const { data: existingUser, error: lookupErr } = await supabase.auth.admin.getUserById(userId)
+  if (lookupErr?.message?.includes('User not found')) {
     const password = crypto.randomBytes(12).toString('base64')
-    const { error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      id:            userId,
-      email:         userEmail,
+    const { error: createErr } = await supabase.auth.admin.createUser({
+      id: userId,
+      email: userEmail,
       password,
-      email_confirm: true
+      email_confirm: true,
     })
     if (createErr) {
-      console.error('[webhook] Auth create failed:', createErr)
-      return NextResponse.json({ error: 'Auth creation failed' }, { status: 500 })
+      console.error('[webhook] Failed to create user:', createErr)
+      return NextResponse.json({ error: 'User creation failed' }, { status: 500 })
     }
   } else if (lookupErr) {
-    console.error('[webhook] Auth lookup error:', lookupErr)
-    return NextResponse.json({ error: 'Auth lookup failed' }, { status: 500 })
+    console.error('[webhook] Error checking user:', lookupErr)
+    return NextResponse.json({ error: 'User lookup failed' }, { status: 500 })
   }
 
-  // Update users table
-  const { error: updateErr } = await supabaseAdmin
+  // Update user’s plan
+  const { error: updateErr } = await supabase
     .from('users')
-    .update({
-      plan:        mapping.plan,
-      plan_period: mapping.period
-    })
+    .update({ plan: mapping.plan, plan_period: mapping.period })
     .eq('id', userId)
 
   if (updateErr) {
-    console.error('[webhook] DB update failed:', updateErr)
-    return NextResponse.json({ error: 'DB update failed' }, { status: 500 })
+    console.error('[webhook] Failed to update user plan:', updateErr)
+    return NextResponse.json({ error: 'Database update failed' }, { status: 500 })
   }
 
-  console.log(`[webhook] Updated ${userId} → ${mapping.plan}/${mapping.period}`)
+  console.log(`[webhook] Updated user ${userId} → ${mapping.plan}/${mapping.period}`)
   return NextResponse.json({ success: true }, { status: 200 })
 }
